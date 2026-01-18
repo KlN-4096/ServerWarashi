@@ -4,7 +4,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.*;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.Ticket;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.lang.reflect.Field;
@@ -46,6 +48,21 @@ public class TicketOwner<OwnerType> {
                     this.name = "Unknown entity";
                 }
             }
+        } else if (ticket.getType() == TicketType.PLAYER) {
+            owner = "player";
+            final double[] mostNearDistance = {Double.MAX_VALUE};
+            BlockPos ticketPos = ((ChunkPos) key).getWorldPosition();
+            level.players().forEach(serverPlayer -> {
+                double distance = serverPlayer.blockPosition().distSqr(ticketPos);
+                if (distance < mostNearDistance[0]) {
+                    mostNearDistance[0] = distance;
+                    this.name = serverPlayer.getName().getString();
+                    pos = serverPlayer.blockPosition();
+                }
+            });
+        } else if (ticket.getType() == TicketType.START) {
+            owner = "world_start";
+            this.pos = level.getSharedSpawnPos();
         } else {
             owner = key;
             if (owner instanceof BlockPos blockPos) {
