@@ -48,18 +48,20 @@ public class TicketOwner<OwnerType> {
                     this.name = "Unknown entity";
                 }
             }
-        } else if (ticket.getType() == TicketType.PLAYER) {
+        } else if (ticket.getType() == TicketType.PLAYER || this.name.equals("c2me_notickvd")) {
             owner = "player";
             final double[] mostNearDistance = {Double.MAX_VALUE};
-            BlockPos ticketPos = ((ChunkPos) key).getWorldPosition();
-            level.players().forEach(serverPlayer -> {
-                double distance = serverPlayer.blockPosition().distSqr(ticketPos);
-                if (distance < mostNearDistance[0]) {
-                    mostNearDistance[0] = distance;
-                    this.name = serverPlayer.getName().getString();
-                    pos = serverPlayer.blockPosition();
-                }
-            });
+            if (key instanceof ChunkPos chunkPos) {
+                BlockPos ticketPos = chunkPos.getWorldPosition();
+                level.players().forEach(serverPlayer -> {
+                    double distance = serverPlayer.blockPosition().distSqr(ticketPos);
+                    if (distance < mostNearDistance[0]) {
+                        mostNearDistance[0] = distance;
+                        this.name = serverPlayer.getName().getString();
+                        pos = serverPlayer.blockPosition();
+                    }
+                });
+            }
         } else if (ticket.getType() == TicketType.START) {
             owner = "world_start";
             this.pos = level.getSharedSpawnPos();
@@ -67,6 +69,8 @@ public class TicketOwner<OwnerType> {
             owner = key;
             if (owner instanceof BlockPos blockPos) {
                 this.pos = blockPos;
+            } else if (owner instanceof ChunkPos chunkPos) {
+                this.pos = chunkPos.getWorldPosition();
             }
         }
     }
