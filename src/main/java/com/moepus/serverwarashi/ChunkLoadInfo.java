@@ -82,6 +82,8 @@ public class ChunkLoadInfo {
             if (ticket == null) continue;
 
             TicketOwner<?> owner = new TicketOwner<>(ticket, level);
+            if (ticket.getTicketLevel() >= 33 && owner.getName().equals("unknown")) continue;
+
             ownerMap.computeIfAbsent(owner, k -> new HashSet<>()).add(chunkPos);
         }
 

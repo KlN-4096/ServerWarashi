@@ -90,7 +90,7 @@ public class TicketOwner<OwnerType> {
         return Objects.hash(name, owner);
     }
 
-    private String getName() {
+    public String getName() {
         return name;
     }
 
