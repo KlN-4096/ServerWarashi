@@ -65,12 +65,12 @@ public class TicketManager {
         if (allTickets.isEmpty()) return;
 
         if (Config.PAUSE_ALL_TICKETS.get()) {
-            Long2BooleanOpenHashMap modifiedChunks = new Long2BooleanOpenHashMap();
+            LongOpenHashSet modifiedChunks = new LongOpenHashSet();
             for (TicketEntry entry : allTickets) {
                 IPauseableTicket pauseable = (IPauseableTicket) (Object) entry.ticket;
                 pauseable.serverWarashi$setPaused(true);
                 if (pauseable.serverWarashi$needUpdate()) {
-                    modifiedChunks.put(entry.chunkPos, false);
+                    modifiedChunks.add(entry.chunkPos);
                     pauseable.serverWarashi$clearDirty();
                 }
             }
@@ -85,14 +85,14 @@ public class TicketManager {
         // Determine active bucket
         int currentGroupIndex = (age / Config.RUN_EVERY.get()) % buckets.size();
 
-        Long2BooleanOpenHashMap modifiedChunks = new Long2BooleanOpenHashMap();
+        LongOpenHashSet modifiedChunks = new LongOpenHashSet();
         for (int i = 0; i < buckets.size(); i++) {
             boolean isActive = (i == currentGroupIndex);
             for (TicketEntry entry : buckets.get(i)) {
                 IPauseableTicket pauseable = (IPauseableTicket) (Object) entry.ticket;
                 pauseable.serverWarashi$setPaused(!isActive);
                 if (pauseable.serverWarashi$needUpdate()) {
-                    modifiedChunks.computeIfAbsent(entry.chunkPos, k -> isActive);
+                    modifiedChunks.add(entry.chunkPos);
                     pauseable.serverWarashi$clearDirty();
                 }
             }
@@ -102,12 +102,14 @@ public class TicketManager {
         updateChunkLevel((DistanceManagerAccessor) distanceManager, modifiedChunks);
     }
 
-    private static void updateChunkLevel(DistanceManagerAccessor distanceManager, Long2BooleanOpenHashMap modifiedChunks) {
-        for (long chunkPos : modifiedChunks.keySet()) {
+    private static void updateChunkLevel(DistanceManagerAccessor distanceManager, LongOpenHashSet modifiedChunks) {
+        for (long chunkPos : modifiedChunks) {
             var ticketSet = distanceManager.getTickets().get(chunkPos);
             if (ticketSet != null) {
-                int newLevel = updateTicketSet(ticketSet);
-                boolean isDecreasing = modifiedChunks.get(chunkPos);
+                int originalLevel = getOriginalTicketLevel(ticketSet);
+                updateTicketSet(ticketSet);
+                int newLevel = getTicketLevel(ticketSet);
+                boolean isDecreasing = newLevel <= originalLevel;
                 distanceManager.getTicketTracker().update(chunkPos, newLevel, isDecreasing);
                 if (!ticketSet.isEmpty() && isDecreasing) {
                     distanceManager.getTickingTicketsTracker().update(chunkPos, newLevel, true);
@@ -116,16 +118,20 @@ public class TicketManager {
         }
     }
 
-    private static int updateTicketSet(SortedArraySet<Ticket<?>> tickets) {
-        List<Ticket<?>> tmp = new ArrayList<>(tickets);
-        tickets.clear();
-        tickets.addAll(tmp);
-        return getTicketLevel(tickets);
-    }
-
     private static int getTicketLevel(SortedArraySet<Ticket<?>> tickets) {
         if (tickets.isEmpty()) return 45;
         return tickets.first().getTicketLevel();
+    }
+
+    private static int getOriginalTicketLevel(SortedArraySet<Ticket<?>> tickets) {
+        if (tickets.isEmpty()) return 45;
+        return ((IPauseableTicket) (Object) tickets.first()).serverWarashi$getLevel();
+    }
+
+    private static void updateTicketSet(SortedArraySet<Ticket<?>> tickets) {
+        List<Ticket<?>> tmp = new ArrayList<>(tickets);
+        tickets.clear();
+        tickets.addAll(tmp);
     }
 
     private static @NotNull List<List<TicketEntry>> divideChunkBuckets(List<TicketEntry> allTickets) {
@@ -162,7 +168,7 @@ public class TicketManager {
         return buckets;
     }
 
-    private static boolean isSystemTicket(Ticket<?> ticket) {
+    public static boolean isSystemTicket(Ticket<?> ticket) {
         if (((IPauseableTicket) (Object) ticket).serverWarashi$getLevel() > 32) return true;
 
         var type = ticket.getType();

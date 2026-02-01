@@ -1,7 +1,9 @@
 package com.moepus.serverwarashi.mixin;
 
 import com.moepus.serverwarashi.IPauseableTicket;
+import com.moepus.serverwarashi.TicketManager;
 import net.minecraft.server.level.Ticket;
+import net.minecraft.server.level.TicketType;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -17,11 +19,31 @@ public abstract class TicketMixin implements IPauseableTicket {
     @Final
     private int ticketLevel;
 
+    @Shadow
+    public abstract int getTicketLevel();
+
+    @Shadow
+    public abstract TicketType<?> getType();
+
     @Unique
     private boolean serverWarashi$isPaused = false;
 
     @Unique
     private boolean serverWarashi$dirty = false;
+
+    @Inject(method = "compareTo*", at = @At("HEAD"), cancellable = true)
+    private void onCompareTo(Ticket<?> other, CallbackInfoReturnable<Integer> cir) {
+        if (this.getType() == other.getType()) {
+            return;
+        }
+
+        boolean mePaused = this.serverWarashi$isPaused;
+        boolean themPaused = ((IPauseableTicket) (Object) other).serverWarashi$isPaused();
+
+        if (mePaused != themPaused) {
+            cir.setReturnValue(mePaused ? 1 : -1);
+        }
+    }
 
     @Override
     @Unique
