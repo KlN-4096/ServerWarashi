@@ -6,8 +6,11 @@
   "mixins": [
     "DistanceManagerAccessor",
     "EntitySectionStorageAccessor",
+    "LevelBlockEntityTickMixin",
+    "LevelEntityTickMixin",
     "PersistentEntitySectionManagerAccessor",
     "ServerLevelAcessor",
+    "ServerLevelChunkTickMixin",
     "ServerWatchdogMixin",
     "TicketMixin"
   ],

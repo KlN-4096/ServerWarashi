@@ -90,8 +90,22 @@ public class TicketOwner<OwnerType> {
         return Objects.hash(name, owner);
     }
 
-    private String getName() {
+    /**
+     * Returns the resolved owner name.
+     *
+     * @return owner name
+     */
+    public String getName() {
         return name;
+    }
+
+    /**
+     * Returns the owner position if available.
+     *
+     * @return owner position or null
+     */
+    public BlockPos getPos() {
+        return pos;
     }
 
     @Override
@@ -125,5 +139,49 @@ public class TicketOwner<OwnerType> {
                 );
 
         return message.append(base).append(coord);
+    }
+
+    /**
+     * Builds a component using a custom display name with optional hover text.
+     *
+     * @param displayName display name to show
+     * @param hoverText   hover text for the name, or null for none
+     * @return component with clickable coordinates if available
+     */
+    public Component asComponentWithName(String displayName, String hoverText) {
+        if (pos == null) {
+            MutableComponent base = Component.literal(displayName + "@null");
+            if (hoverText != null && !hoverText.isEmpty()) {
+                base = base.setStyle(Style.EMPTY.withHoverEvent(new HoverEvent(
+                        HoverEvent.Action.SHOW_TEXT,
+                        Component.literal(hoverText)
+                )));
+            }
+            return base;
+        }
+
+        int x = pos.getX();
+        int y = pos.getY();
+        int z = pos.getZ();
+
+        Style nameStyle = Style.EMPTY;
+        if (hoverText != null && !hoverText.isEmpty()) {
+            nameStyle = nameStyle.withHoverEvent(new HoverEvent(
+                    HoverEvent.Action.SHOW_TEXT,
+                    Component.literal(hoverText)
+            ));
+        }
+
+        Component base = Component.literal(displayName + "@").setStyle(nameStyle);
+        Component coord = Component.literal("(" + x + "," + y + "," + z + ")")
+                .setStyle(
+                        Style.EMPTY
+                                .withColor(TextColor.fromRgb(0xFFD700))
+                                .withClickEvent(new ClickEvent(
+                                        ClickEvent.Action.RUN_COMMAND,
+                                        String.format("/tp @p %d %d %d", x, y, z)
+                                ))
+                );
+        return Component.empty().append(base).append(coord);
     }
 }
