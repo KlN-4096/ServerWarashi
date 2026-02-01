@@ -171,18 +171,6 @@ public class WarashiCommands {
         return 1;
     }
 
-    /**
-     * Lists available ticket groups for performance tracking.
-     *
-     * @param context command context
-     * @return command result
-     */
-    /**
-     * Starts performance tracking for a group index.
-     *
-     * @param context command context
-     * @return command result
-     */
     private static int StartPerfGroup(CommandContext<CommandSourceStack> context) {
         int groupIndex = IntegerArgumentType.getInteger(context, "group");
         boolean ignore33 = getOptionalBool(context, "ignore33", true);

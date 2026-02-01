@@ -189,6 +189,9 @@ final class ChunkPerfModule {
      */
     void onServerTick(MinecraftServer server) {
         long now = System.currentTimeMillis();
+        for (var session : sessions.values()) {
+            session.onServerTick();
+        }
         if (autoAnalyses.isEmpty()) {
             return;
         }
@@ -402,6 +405,10 @@ final class ChunkPerfModule {
          */
         private final int entityCount;
         /**
+         * Server tick count for this session.
+         */
+        private long serverTickCount;
+        /**
          * Session start timestamp in nanoseconds.
          */
         private final long startedAtNanos;
@@ -490,6 +497,13 @@ final class ChunkPerfModule {
         }
 
         /**
+         * Records a server tick for this session.
+         */
+        private void onServerTick() {
+            serverTickCount++;
+        }
+
+        /**
          * Records a tick measurement.
          *
          * @param type          block entity type identifier
@@ -542,17 +556,16 @@ final class ChunkPerfModule {
         private Component buildReport() {
             long elapsedNanos = System.nanoTime() - startedAtNanos;
             double beTotalMs = beTotalNanos / 1_000_000.0;
-            double bePerTickMs = beTickCount == 0 ? 0.0 : beTotalMs / beTickCount;
             double beMaxMs = beMaxNanos / 1_000_000.0;
             double entityTotalMs = entityTotalNanos / 1_000_000.0;
-            double entityPerTickMs = entityTickCount == 0 ? 0.0 : entityTotalMs / entityTickCount;
             double entityMaxMs = entityMaxNanos / 1_000_000.0;
             double chunkTotalMs = chunkTotalNanos / 1_000_000.0;
-            double chunkPerTickMs = chunkTickCount == 0 ? 0.0 : chunkTotalMs / chunkTickCount;
             double chunkMaxMs = chunkMaxNanos / 1_000_000.0;
             double combinedTotalMs = beTotalMs + entityTotalMs + chunkTotalMs;
-            long totalTicks = beTickCount + entityTickCount + chunkTickCount;
-            double totalPerTickMs = totalTicks == 0 ? 0.0 : combinedTotalMs / totalTicks;
+            double totalPerTickMs = serverTickCount == 0 ? 0.0 : combinedTotalMs / serverTickCount;
+            double beMspt = serverTickCount == 0 ? 0.0 : beTotalMs / serverTickCount;
+            double entityMspt = serverTickCount == 0 ? 0.0 : entityTotalMs / serverTickCount;
+            double chunkMspt = serverTickCount == 0 ? 0.0 : chunkTotalMs / serverTickCount;
             Duration elapsed = Duration.ofNanos(elapsedNanos);
 
             MutableComponent root = Component.literal("ServerWarashi Profiler Report\n")
@@ -565,16 +578,16 @@ final class ChunkPerfModule {
                             + ", Entity=" + entityCount
                             + "  | Elapsed: " + elapsed.toSeconds() + "s\n")
                             .withStyle(ChatFormatting.GRAY))
-                    .append(Component.literal(String.format("Total: %.3fms, Totalticks: %d, %.6fms/tick\n",
-                            combinedTotalMs, totalTicks, totalPerTickMs))
+                    .append(Component.literal(String.format("Total: %.3fms, ServerTicks: %d, mspt=%.6fms/tick\n",
+                            combinedTotalMs, serverTickCount, totalPerTickMs))
                             .withStyle(ChatFormatting.GOLD))
                     .append(Component.literal("---- summary ----\n").withStyle(ChatFormatting.DARK_AQUA))
-                    .append(Component.literal(String.format("block entities (%.6fms/tick)>total=%.3fms, max=%.3fms, ticks=%d\n",
-                            bePerTickMs, beTotalMs, beMaxMs, beTickCount)).withStyle(ChatFormatting.GREEN))
-                    .append(Component.literal(String.format("entities (%.6fms/tick)>total=%.3fms, max=%.3fms, ticks=%d\n",
-                            entityPerTickMs, entityTotalMs, entityMaxMs, entityTickCount)).withStyle(ChatFormatting.YELLOW))
-                    .append(Component.literal(String.format("chunks (%.6fms/tick)>total=%.3fms, max=%.3fms, ticks=%d\n",
-                            chunkPerTickMs, chunkTotalMs, chunkMaxMs, chunkTickCount)).withStyle(ChatFormatting.BLUE));
+                    .append(Component.literal(String.format("block entities (mspt=%.6fms/tick)>total=%.3fms, max=%.3fms, ticks=%d\n",
+                            beMspt, beTotalMs, beMaxMs, beTickCount)).withStyle(ChatFormatting.GREEN))
+                    .append(Component.literal(String.format("entities (mspt=%.6fms/tick)>total=%.3fms, max=%.3fms, ticks=%d\n",
+                            entityMspt, entityTotalMs, entityMaxMs, entityTickCount)).withStyle(ChatFormatting.YELLOW))
+                    .append(Component.literal(String.format("chunks (mspt=%.6fms/tick)>total=%.3fms, max=%.3fms, ticks=%d\n",
+                            chunkMspt, chunkTotalMs, chunkMaxMs, chunkTickCount)).withStyle(ChatFormatting.BLUE));
 
             root = root.append(Component.literal("---- top block entities ----\n").withStyle(ChatFormatting.DARK_GREEN));
             var topBe = typeTotals.object2LongEntrySet().stream()
@@ -584,9 +597,9 @@ final class ChunkPerfModule {
             for (var entry : topBe) {
                 long count = typeCounts.getLong(entry.getKey());
                 double typeMs = entry.getLongValue() / 1_000_000.0;
-                double typePerTick = count == 0 ? 0.0 : typeMs / count;
-                root = root.append(Component.literal(String.format(" - %s (%.6fms/tick): total=%.3fms, ticks=%d\n",
-                        entry.getKey(), typePerTick, typeMs, count)).withStyle(ChatFormatting.GREEN));
+                double typeMspt = serverTickCount == 0 ? 0.0 : typeMs / serverTickCount;
+                root = root.append(Component.literal(String.format(" - %s (mspt=%.6fms/tick): total=%.3fms, ticks=%d\n",
+                        entry.getKey(), typeMspt, typeMs, count)).withStyle(ChatFormatting.GREEN));
             }
 
             root = root.append(Component.literal("---- top entities ----\n").withStyle(ChatFormatting.GOLD));
@@ -597,9 +610,9 @@ final class ChunkPerfModule {
             for (var entry : topEntities) {
                 long count = entityCounts.getLong(entry.getKey());
                 double typeMs = entry.getLongValue() / 1_000_000.0;
-                double typePerTick = count == 0 ? 0.0 : typeMs / count;
-                root = root.append(Component.literal(String.format(" - %s (%.6fms/tick): total=%.3fms, ticks=%d\n",
-                        entry.getKey(), typePerTick, typeMs, count)).withStyle(ChatFormatting.YELLOW));
+                double typeMspt = serverTickCount == 0 ? 0.0 : typeMs / serverTickCount;
+                root = root.append(Component.literal(String.format(" - %s (mspt=%.6fms/tick): total=%.3fms, ticks=%d\n",
+                        entry.getKey(), typeMspt, typeMs, count)).withStyle(ChatFormatting.YELLOW));
             }
 
             return root;
