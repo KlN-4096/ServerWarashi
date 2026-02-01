@@ -1,10 +1,11 @@
-package com.moepus.serverwarashi.mixin;
+package com.moepus.serverwarashi.mixin.chunkperf;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.moepus.serverwarashi.chunkperf.ChunkPerfManager;
+import com.moepus.serverwarashi.chunkperf.core.ChunkPerfManager;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -12,23 +13,24 @@ import org.spongepowered.asm.mixin.injection.At;
 import java.util.function.Consumer;
 
 /**
- * Mixin to measure entity tick durations for selected chunk groups.
+ * 用于测量选定区块组实体 tick 耗时的 Mixin。
  */
 @Mixin(value = Level.class, remap = false)
 public abstract class LevelEntityTickMixin {
     /**
-     * Indicates whether this level is client-side.
+     * 指示该世界是否为客户端侧。
      */
+    @Final
     @Shadow
     public boolean isClientSide;
 
     /**
-     * Wraps the entity tick to record duration when tracking is enabled.
+     * 包装实体 tick，在启用跟踪时记录耗时。
      *
-     * @param consumer the original consumer
-     * @param entity   the entity being ticked
-     * @param original the original call
-     * @param <T>      entity type
+     * @param consumer 原始 consumer
+     * @param entity   正在 tick 的实体
+     * @param original 原始调用
+     * @param <T>      实体类型
      */
     @WrapOperation(
             method = "guardEntityTick",
@@ -49,6 +51,6 @@ public abstract class LevelEntityTickMixin {
         long start = System.nanoTime();
         original.call(consumer, entity);
         long duration = System.nanoTime() - start;
-        ChunkPerfManager.onEntityTick(level, mcEntity.blockPosition(), mcEntity.getType().toString(), duration);
+        ChunkPerfManager.onEntityTick(level, mcEntity.blockPosition(), mcEntity.getType().toString(), duration, false);
     }
 }

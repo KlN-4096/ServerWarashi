@@ -6,13 +6,13 @@
   "mixins": [
     "DistanceManagerAccessor",
     "EntitySectionStorageAccessor",
-    "LevelBlockEntityTickMixin",
-    "LevelEntityTickMixin",
     "PersistentEntitySectionManagerAccessor",
     "ServerLevelAcessor",
-    "ServerLevelChunkTickMixin",
-    "ServerWatchdogMixin",
-    "TicketMixin"
+    "chunkperf.LevelBlockEntityTickMixin",
+    "chunkperf.LevelEntityTickMixin",
+    "chunkperf.ServerLevelChunkTickMixin",
+    "TicketMixin",
+    "ServerWatchdogMixin"
   ],
   "client": [
   ],

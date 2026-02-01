@@ -1,6 +1,6 @@
-package com.moepus.serverwarashi.mixin;
+package com.moepus.serverwarashi.mixin.chunkperf;
 
-import com.moepus.serverwarashi.chunkperf.ChunkPerfManager;
+import com.moepus.serverwarashi.chunkperf.core.ChunkPerfManager;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -11,22 +11,22 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Mixin to measure chunk tick durations for selected chunk groups.
+ * 用于测量选定区块组区块 tick 耗时的 Mixin。
  */
 @Mixin(value = ServerLevel.class, remap = false)
 public abstract class ServerLevelChunkTickMixin {
     /**
-     * Start time for the current chunk tick.
+     * 当前区块 tick 的开始时间。
      */
     @Unique
     private long serverWarashi$chunkTickStart;
 
     /**
-     * Records the start time for chunk ticking.
+     * 记录区块 tick 的开始时间。
      *
-     * @param chunk the chunk being ticked
-     * @param randomTickSpeed random tick speed
-     * @param ci    callback info
+     * @param chunk           正在 tick 的区块
+     * @param randomTickSpeed 随机 tick 速度
+     * @param ci              回调信息
      */
     @Inject(method = "tickChunk", at = @At("HEAD"))
     private void onTickChunkStart(LevelChunk chunk, int randomTickSpeed, CallbackInfo ci) {
@@ -34,11 +34,11 @@ public abstract class ServerLevelChunkTickMixin {
     }
 
     /**
-     * Records the end time for chunk ticking and reports if tracking is enabled.
+     * 记录区块 tick 的结束时间，并在启用跟踪时上报。
      *
-     * @param chunk the chunk being ticked
-     * @param randomTickSpeed random tick speed
-     * @param ci    callback info
+     * @param chunk           正在 tick 的区块
+     * @param randomTickSpeed 随机 tick 速度
+     * @param ci              回调信息
      */
     @Inject(method = "tickChunk", at = @At("TAIL"))
     private void onTickChunkEnd(LevelChunk chunk, int randomTickSpeed, CallbackInfo ci) {
