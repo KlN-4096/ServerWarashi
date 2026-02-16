@@ -36,6 +36,7 @@ public class TicketManager {
         if (level.isClientSide) return;
 
         if (level instanceof ServerLevel serverLevel) {
+            applyStoredManualPausedChunks(serverLevel);
             processTickets(serverLevel);
         }
     }
@@ -44,6 +45,7 @@ public class TicketManager {
     private static void processTickets(ServerLevel level) {
         if (age % Config.RUN_EVERY.get() != 0) return;
 
+        ManualPauseData manualData = ManualPauseData.get(level);
         DistanceManager distanceManager = level.getChunkSource().chunkMap.getDistanceManager();
         var tickets = ((DistanceManagerAccessor) distanceManager).getTickets().long2ObjectEntrySet();
 
@@ -51,6 +53,9 @@ public class TicketManager {
         List<TicketEntry> allTickets = new ArrayList<>();
         for (var entry : tickets) {
             long chunkPosLong = entry.getLongKey();
+            if (manualData.contains(chunkPosLong)) {
+                continue;
+            }
             int chunkX = ChunkPos.getX(chunkPosLong);
             int chunkZ = ChunkPos.getZ(chunkPosLong);
 
@@ -67,7 +72,7 @@ public class TicketManager {
         if (Config.PAUSE_ALL_TICKETS.get()) {
             Long2BooleanOpenHashMap modifiedChunks = new Long2BooleanOpenHashMap();
             for (TicketEntry entry : allTickets) {
-                if (applyPause(entry.ticket, true)) {
+                if (applyAutoPause(entry.ticket, true)) {
                     modifiedChunks.put(entry.chunkPos, false);
                 }
             }
@@ -86,8 +91,8 @@ public class TicketManager {
         for (int i = 0; i < buckets.size(); i++) {
             boolean isActive = (i == currentGroupIndex);
             for (TicketEntry entry : buckets.get(i)) {
-                if (applyPause(entry.ticket, !isActive)) {
-                    modifiedChunks.computeIfAbsent(entry.chunkPos, k -> isActive);
+                if (applyAutoPause(entry.ticket, !isActive)) {
+                    modifiedChunks.putIfAbsent(entry.chunkPos, isActive);
                 }
             }
         }
@@ -114,15 +119,61 @@ public class TicketManager {
         }
     }
 
-    public static boolean applyPause(Ticket<?> ticket, boolean paused) {
+    private static void applyStoredManualPausedChunks(ServerLevel level) {
+        ManualPauseData manualData = ManualPauseData.get(level);
+        if (manualData.isEmpty()) {
+            return;
+        }
+        DistanceManager distanceManager = level.getChunkSource().chunkMap.getDistanceManager();
+        DistanceManagerAccessor accessor = (DistanceManagerAccessor) distanceManager;
+        Long2BooleanOpenHashMap modifiedChunks = new Long2BooleanOpenHashMap();
+        LongIterator iterator = manualData.iterator();
+        while (iterator.hasNext()) {
+            long chunkPos = iterator.nextLong();
+            SortedArraySet<Ticket<?>> ticketSet = accessor.getTickets().get(chunkPos);
+            if (ticketSet == null || ticketSet.isEmpty()) {
+                continue;
+            }
+            boolean changed = false;
+            for (Ticket<?> ticket : ticketSet) {
+                if (isSystemTicket(ticket)) {
+                    continue;
+                }
+                if (applyManualPause(ticket, true)) {
+                    changed = true;
+                }
+            }
+            if (changed) {
+                modifiedChunks.put(chunkPos, false);
+            }
+        }
+        if (!modifiedChunks.isEmpty()) {
+            updateChunkLevel(accessor, modifiedChunks);
+        }
+    }
+
+    public static boolean applyAutoPause(Ticket<?> ticket, boolean paused) {
+        return applyPauseReason(ticket, paused, IPauseableTicket.PAUSE_REASON_AUTO);
+    }
+
+    public static boolean applyManualPause(Ticket<?> ticket, boolean paused) {
+        return applyPauseReason(ticket, paused, IPauseableTicket.PAUSE_REASON_MANUAL);
+    }
+
+    private static boolean applyPauseReason(Ticket<?> ticket, boolean paused, int reasonMask) {
         IPauseableTicket pauseable = (IPauseableTicket) (Object) ticket;
-        boolean wasPaused = pauseable.serverWarashi$isPaused();
-        pauseable.serverWarashi$setPaused(paused);
+        assert pauseable != null;
+        int before = pauseable.serverWarashi$getPauseMask();
+        int after = paused ? (before | reasonMask) : (before & ~reasonMask);
+        if (before == after) {
+            return false;
+        }
+        pauseable.serverWarashi$setPauseMask(after);
         boolean needUpdate = pauseable.serverWarashi$needUpdate();
         if (needUpdate) {
             pauseable.serverWarashi$clearDirty();
         }
-        return needUpdate || (wasPaused != paused);
+        return needUpdate;
     }
 
     private static int updateTicketSet(SortedArraySet<Ticket<?>> tickets) {
@@ -144,15 +195,13 @@ public class TicketManager {
         List<List<TicketEntry>> buckets = new ArrayList<>();
         List<TicketEntry> current = new ArrayList<>();
 
-        for (int i = 0; i < allTickets.size(); i++) {
-            TicketEntry entry = allTickets.get(i);
-
+        for (TicketEntry entry : allTickets) {
             if (current.size() < targetBucketSize) {
                 current.add(entry);
             } else {
                 boolean tooClose = false;
                 if (!current.isEmpty()) {
-                    long diff = entry.morton - current.get(current.size() - 1).morton;
+                    long diff = entry.morton - current.getLast().morton;
                     tooClose = (diff <= Config.PROXIMITY_THRESHOLD.get());
                 }
 

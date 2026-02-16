@@ -1,5 +1,6 @@
 package com.moepus.serverwarashi.chunkperf.ticket;
 
+import com.moepus.serverwarashi.ManualPauseData;
 import com.moepus.serverwarashi.TicketManager;
 import com.moepus.serverwarashi.chunkperf.core.ChunkPerfMessages;
 import com.moepus.serverwarashi.chunkperf.core.cache.ChunkPerfGroupCache;
@@ -63,6 +64,14 @@ public record ChunkPerfTicketController(ChunkPerfGroupCache groupCache) {
                                   Set<Long> chunks,
                                   boolean paused,
                                   boolean isDecreasing) {
+        ManualPauseData manualData = ManualPauseData.get(level);
+        for (long chunkPos : chunks) {
+            if (paused) {
+                manualData.add(chunkPos);
+            } else {
+                manualData.remove(chunkPos);
+            }
+        }
         DistanceManager distanceManager = level.getChunkSource().chunkMap.getDistanceManager();
         DistanceManagerAccessor accessor = (DistanceManagerAccessor) distanceManager;
         int updated = 0;
@@ -76,7 +85,7 @@ public record ChunkPerfTicketController(ChunkPerfGroupCache groupCache) {
                 if (TicketManager.isSystemTicket(ticket)) {
                     continue;
                 }
-                if (TicketManager.applyPause(ticket, paused)) {
+                if (TicketManager.applyManualPause(ticket, paused)) {
                     changed = true;
                 }
             }

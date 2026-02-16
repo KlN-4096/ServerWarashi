@@ -18,7 +18,7 @@ public abstract class TicketMixin implements IPauseableTicket {
     private int ticketLevel;
 
     @Unique
-    private boolean serverWarashi$isPaused = false;
+    private int serverWarashi$pauseMask = 0;
 
     @Unique
     private boolean serverWarashi$dirty = false;
@@ -26,7 +26,7 @@ public abstract class TicketMixin implements IPauseableTicket {
     @Override
     @Unique
     public boolean serverWarashi$isPaused() {
-        return serverWarashi$isPaused;
+        return serverWarashi$pauseMask != 0;
     }
 
     @Override
@@ -36,11 +36,17 @@ public abstract class TicketMixin implements IPauseableTicket {
 
     @Override
     @Unique
-    public void serverWarashi$setPaused(boolean paused) {
-        if (this.serverWarashi$isPaused != paused) {
+    public int serverWarashi$getPauseMask() {
+        return serverWarashi$pauseMask;
+    }
+
+    @Override
+    @Unique
+    public void serverWarashi$setPauseMask(int mask) {
+        if (this.serverWarashi$pauseMask != mask) {
             this.serverWarashi$dirty = true;
+            this.serverWarashi$pauseMask = mask;
         }
-        serverWarashi$isPaused = paused;
     }
 
     @Override
@@ -60,7 +66,7 @@ public abstract class TicketMixin implements IPauseableTicket {
 
     @Inject(method = "getTicketLevel", at = @At("HEAD"), cancellable = true)
     private void onGetTicketLevel(CallbackInfoReturnable<Integer> cir) {
-        if (serverWarashi$isPaused) {
+        if (serverWarashi$pauseMask != 0) {
             cir.setReturnValue(33);
         }
     }
