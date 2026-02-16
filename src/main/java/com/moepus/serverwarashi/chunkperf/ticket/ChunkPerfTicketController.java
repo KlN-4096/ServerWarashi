@@ -2,6 +2,7 @@ package com.moepus.serverwarashi.chunkperf.ticket;
 
 import com.moepus.serverwarashi.ManualPauseData;
 import com.moepus.serverwarashi.TicketManager;
+import com.moepus.serverwarashi.utils.TicketPauseUtil;
 import com.moepus.serverwarashi.chunkperf.core.ChunkPerfMessages;
 import com.moepus.serverwarashi.chunkperf.core.cache.ChunkPerfGroupCache;
 import com.moepus.serverwarashi.chunkperf.core.cache.ChunkPerfGroupEntry;
@@ -85,12 +86,12 @@ public record ChunkPerfTicketController(ChunkPerfGroupCache groupCache) {
                 if (TicketManager.isSystemTicket(ticket)) {
                     continue;
                 }
-                if (TicketManager.applyManualPause(ticket, paused)) {
+                if (TicketPauseUtil.applyManualPause(ticket, paused)) {
                     changed = true;
                 }
             }
             if (changed) {
-                TicketManager.updateChunkLevel(accessor, chunkPos, isDecreasing);
+                TicketPauseUtil.updateChunkLevel(accessor, chunkPos, isDecreasing);
                 updated++;
             }
         }

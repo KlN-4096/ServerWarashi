@@ -43,6 +43,27 @@ public final class ChunkPerfMessages {
         return Component.literal("No active chunk perf session.");
     }
 
+    /**
+     * 没有活动的分析会话时的提示。
+     */
+    public static Component noActiveAnalysis() {
+        return Component.literal("No active perf analysis.");
+    }
+
+    /**
+     * 已有分析在运行时的提示。
+     */
+    public static Component analysisAlreadyRunning() {
+        return Component.literal("Another perf analysis is already running.");
+    }
+
+    /**
+     * 没有活动的全分组分析会话时的提示。
+     */
+    public static Component noActiveGroupAnalysis() {
+        return Component.literal("No active group analysis session.");
+    }
+
 
     /**
      * 分组索引越界时的提示。
@@ -75,6 +96,31 @@ public final class ChunkPerfMessages {
                         + ", BE=" + blockEntityCount
                         + ", E=" + entityCount
                         + ").\n").withStyle(ChatFormatting.GRAY));
+        if (durationSec == 0) {
+            message = message.append(Component.literal("    Use /warashi perf stop to end.\n")
+                    .withStyle(ChatFormatting.GRAY));
+        }
+        return message;
+    }
+
+    /**
+     * 全分组分析开始提示。
+     *
+     * @param groupCount  分组数量
+     * @param durationSec 持续秒数，{@code 0} 表示不启用定时分析
+     */
+    public static Component allGroupsAnalysisStarted(int groupCount, int durationSec) {
+        String header = durationSec > 0
+                ? "All group analysis started (" + durationSec + "s) >\n"
+                : "All group analysis started >\n";
+        MutableComponent message = Component.literal(header)
+                .withStyle(ChatFormatting.AQUA);
+        message = message.append(Component.literal("    ").withStyle(ChatFormatting.DARK_GRAY))
+                .append(Component.literal("Groups=" + groupCount + "\n").withStyle(ChatFormatting.GRAY));
+        if (durationSec == 0) {
+            message = message.append(Component.literal("    Use /warashi perf stop to end.\n")
+                    .withStyle(ChatFormatting.GRAY));
+        }
         return message;
     }
 
@@ -114,9 +160,12 @@ public final class ChunkPerfMessages {
     public static MutableComponent buildOwnerStatsComponent(
             String header,
             ChunkPerfTickets.OwnerStatsSnapshot snapshot,
-            ChunkPerfTickets.SortMode sortMode
+            ChunkPerfTickets.SortMode sortMode,
+            ChunkPerfTickets.PauseMode pauseMode,
+            boolean showActions,
+            Map<TicketOwner<?>, Integer> stableIndex
     ) {
-        MutableComponent message = formatOwnerStatsToComponent(header, snapshot.ownerStats(), sortMode);
+        MutableComponent message = formatOwnerStatsToComponent(header, snapshot.ownerStats(), sortMode, pauseMode, showActions, stableIndex);
         if (snapshot.ownerMap().isEmpty()) {
             message.append(noTicketsFoundLine());
         }
@@ -129,7 +178,10 @@ public final class ChunkPerfMessages {
     public static MutableComponent formatOwnerStatsToComponent(
             String header,
             HashMap<TicketOwner<?>, ChunkPerfTickets.OwnerStats> ownerStats,
-            ChunkPerfTickets.SortMode sortMode
+            ChunkPerfTickets.SortMode sortMode,
+            ChunkPerfTickets.PauseMode pauseMode,
+            boolean showActions,
+            Map<TicketOwner<?>, Integer> stableIndex
     ) {
         MutableComponent root = Component.literal(header + "\n").withStyle(ChatFormatting.AQUA);
         List<Map.Entry<TicketOwner<?>, ChunkPerfTickets.OwnerStats>> baseEntries =
@@ -141,11 +193,17 @@ public final class ChunkPerfMessages {
 
         List<Map.Entry<TicketOwner<?>, ChunkPerfTickets.OwnerStats>> entries =
                 ChunkPerfTickets.sortOwnerStats(ownerStats, sortMode);
+        boolean showRestore = pauseMode == ChunkPerfTickets.PauseMode.PAUSED_ONLY;
         for (int i = 0; i < entries.size(); i++) {
             Map.Entry<TicketOwner<?>, ChunkPerfTickets.OwnerStats> entry = entries.get(i);
             TicketOwner<?> owner = entry.getKey();
             ChunkPerfTickets.OwnerStats stats = entry.getValue();
-            int groupIndex = baseIndex.getOrDefault(owner, i);
+            int groupIndex;
+            if (stableIndex != null) {
+                groupIndex = stableIndex.getOrDefault(owner, baseIndex.getOrDefault(owner, i));
+            } else {
+                groupIndex = baseIndex.getOrDefault(owner, i);
+            }
             MutableComponent line = Component.empty()
                     .append(owner.asComponent())
                     .append(Component.literal(" ").withStyle(ChatFormatting.DARK_GRAY))
@@ -153,42 +211,47 @@ public final class ChunkPerfMessages {
                     .append(Component.literal("C=" + stats.chunkCount() + " ").withStyle(ChatFormatting.BLUE))
                     .append(Component.literal("BE=" + stats.blockEntityCount() + " ").withStyle(ChatFormatting.GREEN))
                     .append(Component.literal("E=" + stats.entityCount() + " ").withStyle(ChatFormatting.YELLOW));
-            line = line.append(Component.literal(" "))
-                    .append(Component.literal("[analyze]")
-                            .withStyle(Style.EMPTY
-                                    .withColor(ChatFormatting.LIGHT_PURPLE)
-                                    .withHoverEvent(new HoverEvent(
-                                            HoverEvent.Action.SHOW_TEXT,
-                                            Component.literal("Run a 60s analysis and auto-report")
-                                    ))
-                                    .withClickEvent(new ClickEvent(
-                                            ClickEvent.Action.RUN_COMMAND,
-                                            "/warashi perf start " + groupIndex + " 60"
-                                    ))))
-                    .append(Component.literal(" "))
-                    .append(Component.literal("[lower]")
-                            .withStyle(Style.EMPTY
-                                    .withColor(ChatFormatting.RED)
-                                    .withHoverEvent(new HoverEvent(
-                                            HoverEvent.Action.SHOW_TEXT,
-                                            Component.literal("Lower ticket level for this group")
-                                    ))
-                                    .withClickEvent(new ClickEvent(
-                                            ClickEvent.Action.RUN_COMMAND,
-                                            "/warashi perf lower " + groupIndex
-                                    ))))
-                    .append(Component.literal(" "))
-                    .append(Component.literal("[restore]")
-                            .withStyle(Style.EMPTY
-                                    .withColor(ChatFormatting.GREEN)
-                                    .withHoverEvent(new HoverEvent(
-                                            HoverEvent.Action.SHOW_TEXT,
-                                            Component.literal("Restore ticket level for this group")
-                                    ))
-                                    .withClickEvent(new ClickEvent(
-                                            ClickEvent.Action.RUN_COMMAND,
-                                            "/warashi perf restore " + groupIndex
-                                    ))));
+            if (showActions) {
+                if (showRestore) {
+                    line = line.append(Component.literal(" "))
+                            .append(Component.literal("[R]")
+                                    .withStyle(Style.EMPTY
+                                            .withColor(ChatFormatting.GREEN)
+                                            .withHoverEvent(new HoverEvent(
+                                                    HoverEvent.Action.SHOW_TEXT,
+                                                    Component.literal("Restore ticket level for this group")
+                                            ))
+                                            .withClickEvent(new ClickEvent(
+                                                    ClickEvent.Action.RUN_COMMAND,
+                                                    "/warashi perf restore " + groupIndex
+                                            ))));
+                } else {
+                    line = line.append(Component.literal(" "))
+                            .append(Component.literal("[A]")
+                                    .withStyle(Style.EMPTY
+                                            .withColor(ChatFormatting.LIGHT_PURPLE)
+                                            .withHoverEvent(new HoverEvent(
+                                                    HoverEvent.Action.SHOW_TEXT,
+                                                    Component.literal("Run a 60s analysis and auto-report")
+                                            ))
+                                            .withClickEvent(new ClickEvent(
+                                                    ClickEvent.Action.RUN_COMMAND,
+                                                    "/warashi perf start group " + groupIndex + " 60"
+                                            ))))
+                            .append(Component.literal(" "))
+                            .append(Component.literal("[L]")
+                                    .withStyle(Style.EMPTY
+                                            .withColor(ChatFormatting.RED)
+                                            .withHoverEvent(new HoverEvent(
+                                                    HoverEvent.Action.SHOW_TEXT,
+                                                    Component.literal("Lower ticket level for this group")
+                                            ))
+                                            .withClickEvent(new ClickEvent(
+                                                    ClickEvent.Action.RUN_COMMAND,
+                                                    "/warashi perf lower " + groupIndex
+                                            ))));
+                }
+            }
             line = line.append(Component.literal("\n").withStyle(ChatFormatting.DARK_GRAY));
             root = root.append(line);
         }
@@ -234,50 +297,163 @@ public final class ChunkPerfMessages {
         MutableComponent root = Component.literal("ServerWarashi Profiler Report\n")
                 .withStyle(ChatFormatting.AQUA)
                 .append(Component.literal("====================================\n").withStyle(ChatFormatting.DARK_GRAY))
-                .append(Component.literal("Target: " + dimension.location() + " | G" + groupIndex + " " + ownerLabel + "\n")
+                .append(Component.literal("Target: " + dimension.location() + " | G" + groupIndex + " " + ownerLabel + " ")
                         .withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("[L]")
+                        .withStyle(Style.EMPTY
+                                .withColor(ChatFormatting.RED)
+                                .withHoverEvent(new HoverEvent(
+                                        HoverEvent.Action.SHOW_TEXT,
+                                        Component.literal("Lower ticket level for this group")
+                                ))
+                                .withClickEvent(new ClickEvent(
+                                        ClickEvent.Action.RUN_COMMAND,
+                                        "/warashi perf lower " + groupIndex
+                                ))))
+                .append(Component.literal("\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("Chunks: " + chunkCount
                                 + ", BlockEntity=" + blockEntityCount
                                 + ", Entity=" + entityCount
                                 + "  | Elapsed: " + elapsed.toSeconds() + "s\n")
                         .withStyle(ChatFormatting.GRAY))
-                .append(Component.literal(String.format("Total: %.3fms, ServerTicks: %d, mspt=%.6fms/tick\n",
-                                combinedTotalMs, serverTickCount, totalPerTickMs))
-                        .withStyle(ChatFormatting.GOLD))
-                .append(Component.literal("---- summary ----\n").withStyle(ChatFormatting.DARK_AQUA))
-                .append(Component.literal(String.format("block entities (mspt=%.6fms/tick)>total=%.3fms, max=%.3fms, ticks=%d\n",
-                        beMspt, beTotalMs, beMaxMs, beTickCount)).withStyle(ChatFormatting.GREEN))
-                .append(Component.literal(String.format("entities (mspt=%.6fms/tick)>total=%.3fms, max=%.3fms, ticks=%d\n",
-                        entityMspt, entityTotalMs, entityMaxMs, entityTickCount)).withStyle(ChatFormatting.YELLOW))
-                .append(Component.literal(String.format("chunks (mspt=%.6fms/tick)>total=%.3fms, max=%.3fms, ticks=%d\n",
-                        chunkMspt, chunkTotalMs, chunkMaxMs, chunkTickCount)).withStyle(ChatFormatting.BLUE));
-
-        root = root.append(Component.literal("---- top block entities ----\n").withStyle(ChatFormatting.DARK_GREEN));
-        var topBe = typeTotals.object2LongEntrySet().stream()
-                .sorted((a, b) -> Long.compare(b.getLongValue(), a.getLongValue()))
-                .limit(5)
-                .toList();
-        for (var entry : topBe) {
-            long count = typeCounts.getLong(entry.getKey());
-            double typeMs = entry.getLongValue() / 1_000_000.0;
-            double typeMspt = serverTickCount == 0 ? 0.0 : typeMs / serverTickCount;
-            root = root.append(Component.literal(String.format(" - %s (mspt=%.6fms/tick): total=%.3fms, ticks=%d\n",
-                    entry.getKey(), typeMspt, typeMs, count)).withStyle(ChatFormatting.GREEN));
+                .append(Component.literal("---- summary ----\n").withStyle(ChatFormatting.DARK_AQUA));
+        if (totalPerTickMs >= 0.01) {
+            root = root.append(Component.literal(String.format("ServerTicks: %d, mspt=%.2fms/tick\n",
+                    serverTickCount, totalPerTickMs)).withStyle(ChatFormatting.GOLD));
+        }
+        if (beMspt >= 0.01) {
+            root = root.append(Component.literal(String.format("block entities (mspt=%.2fms/tick)>max=%.3fms, ticks=%d\n",
+                    beMspt, beMaxMs, beTickCount)).withStyle(ChatFormatting.GREEN));
+        }
+        if (entityMspt >= 0.01) {
+            root = root.append(Component.literal(String.format("entities (mspt=%.2fms/tick)>max=%.3fms, ticks=%d\n",
+                    entityMspt, entityMaxMs, entityTickCount)).withStyle(ChatFormatting.YELLOW));
+        }
+        if (chunkMspt >= 0.01) {
+            root = root.append(Component.literal(String.format("chunks (mspt=%.2fms/tick)>max=%.3fms, ticks=%d\n",
+                    chunkMspt, chunkMaxMs, chunkTickCount)).withStyle(ChatFormatting.BLUE));
         }
 
-        root = root.append(Component.literal("---- top entities ----\n").withStyle(ChatFormatting.GOLD));
-        var topEntities = entityTotals.object2LongEntrySet().stream()
-                .sorted((a, b) -> Long.compare(b.getLongValue(), a.getLongValue()))
-                .limit(5)
-                .toList();
-        for (var entry : topEntities) {
-            long count = entityCounts.getLong(entry.getKey());
-            double typeMs = entry.getLongValue() / 1_000_000.0;
-            double typeMspt = serverTickCount == 0 ? 0.0 : typeMs / serverTickCount;
-            root = root.append(Component.literal(String.format(" - %s (mspt=%.6fms/tick): total=%.3fms, ticks=%d\n",
-                    entry.getKey(), typeMspt, typeMs, count)).withStyle(ChatFormatting.YELLOW));
+        if (!typeTotals.isEmpty()) {
+            var topBe = typeTotals.object2LongEntrySet().stream()
+                    .sorted((a, b) -> Long.compare(b.getLongValue(), a.getLongValue()))
+                    .limit(5)
+                    .toList();
+            boolean headerAdded = false;
+            for (var entry : topBe) {
+                long count = typeCounts.getLong(entry.getKey());
+                double typeMs = entry.getLongValue() / 1_000_000.0;
+                double typeMspt = serverTickCount == 0 ? 0.0 : typeMs / serverTickCount;
+                if (typeMspt < 0.01) {
+                    continue;
+                }
+                if (!headerAdded) {
+                    root = root.append(Component.literal("---- top block entities ----\n").withStyle(ChatFormatting.DARK_GREEN));
+                    headerAdded = true;
+                }
+                root = root.append(Component.literal(String.format(" - %s (mspt=%.2fms/tick): ticks=%d\n",
+                        entry.getKey(), typeMspt, count)).withStyle(ChatFormatting.GREEN));
+            }
         }
 
+        if (!entityTotals.isEmpty()) {
+            var topEntities = entityTotals.object2LongEntrySet().stream()
+                    .sorted((a, b) -> Long.compare(b.getLongValue(), a.getLongValue()))
+                    .limit(5)
+                    .toList();
+            boolean headerAdded = false;
+            for (var entry : topEntities) {
+                long count = entityCounts.getLong(entry.getKey());
+                double typeMs = entry.getLongValue() / 1_000_000.0;
+                double typeMspt = serverTickCount == 0 ? 0.0 : typeMs / serverTickCount;
+                if (typeMspt < 0.01) {
+                    continue;
+                }
+                if (!headerAdded) {
+                    root = root.append(Component.literal("---- top entities ----\n").withStyle(ChatFormatting.GOLD));
+                    headerAdded = true;
+                }
+                root = root.append(Component.literal(String.format(" - %s (mspt=%.2fms/tick): ticks=%d\n",
+                        entry.getKey(), typeMspt, count)).withStyle(ChatFormatting.YELLOW));
+            }
+        }
+
+        return root;
+    }
+
+    /**
+     * 单个分组的性能汇总行。
+     */
+    public record GroupMsptEntry(int groupIndex,
+                                 TicketOwner<?> owner,
+                                 int chunkCount,
+                                 int blockEntityCount,
+                                 int entityCount,
+                                 long beTotalNanos,
+                                 long entityTotalNanos,
+                                 long chunkTotalNanos) {
+        public long totalNanos() {
+            return beTotalNanos + entityTotalNanos + chunkTotalNanos;
+        }
+    }
+
+    /**
+     * 构建全分组性能分析报告。
+     */
+    public static MutableComponent buildGroupMsptReport(ResourceKey<Level> dimension,
+                                                        List<GroupMsptEntry> entries,
+                                                        long serverTickCount,
+                                                        Duration elapsed) {
+        double totalReportedMspt = 0.0;
+        MutableComponent root = Component.literal("Group MSPT Report\n")
+                .withStyle(ChatFormatting.AQUA)
+                .append(Component.literal("====================================\n").withStyle(ChatFormatting.DARK_GRAY))
+                .append(Component.literal("Target: " + dimension.location()
+                                + " | Groups=" + entries.size()
+                                + " | Elapsed=" + elapsed.toSeconds() + "s"
+                                + " | ServerTicks=" + serverTickCount + "\n")
+                        .withStyle(ChatFormatting.GRAY));
+        root = root.append(Component.literal("Note: groups with mspt < 0.01 are omitted.\n")
+                .withStyle(ChatFormatting.DARK_GRAY));
+        if (entries.isEmpty()) {
+            return root.append(noTicketsFoundLine());
+        }
+        for (GroupMsptEntry entry : entries) {
+            double totalMs = entry.totalNanos() / 1_000_000.0;
+            double mspt = serverTickCount == 0 ? 0.0 : totalMs / serverTickCount;
+            if (mspt < 0.01) {
+                continue;
+            }
+            totalReportedMspt += mspt;
+            MutableComponent line = Component.empty()
+                    .append(entry.owner().asComponent())
+                    .append(Component.literal(" ").withStyle(ChatFormatting.DARK_GRAY))
+                    .append(Component.literal("G" + entry.groupIndex() + ": ").withStyle(ChatFormatting.GRAY))
+                    .append(Component.literal(String.format("C=%d, BE=%d, E=%d",
+                                    entry.chunkCount(),
+                                    entry.blockEntityCount(),
+                                    entry.entityCount()))
+                            .withStyle(ChatFormatting.GRAY));
+            line = line.append(Component.literal(" "))
+                    .append(Component.literal(String.format("mspt=%.2f", mspt))
+                            .withStyle(ChatFormatting.GOLD));
+            line = line.append(Component.literal(" "))
+                    .append(Component.literal("[L]")
+                            .withStyle(Style.EMPTY
+                                    .withColor(ChatFormatting.RED)
+                                    .withHoverEvent(new HoverEvent(
+                                            HoverEvent.Action.SHOW_TEXT,
+                                            Component.literal("Lower ticket level for this group")
+                                    ))
+                                    .withClickEvent(new ClickEvent(
+                                            ClickEvent.Action.RUN_COMMAND,
+                                            "/warashi perf lower " + entry.groupIndex()
+                                    ))));
+            line = line.append(Component.literal("\n").withStyle(ChatFormatting.DARK_GRAY));
+            root = root.append(line);
+        }
+        root = root.append(Component.literal(String.format("Reported total mspt=%.2f\n", totalReportedMspt))
+                .withStyle(ChatFormatting.GOLD));
         return root;
     }
 

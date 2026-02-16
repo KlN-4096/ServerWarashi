@@ -1,6 +1,7 @@
 package com.moepus.serverwarashi;
 
 import com.moepus.serverwarashi.chunkperf.entry.ChunkPerfCommands;
+import com.moepus.serverwarashi.utils.TicketPauseUtil;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -24,17 +25,22 @@ public class WarashiCommands {
                 .then(net.minecraft.commands.Commands.literal("enabled")
                         .executes(context -> {
                             context.getSource().sendSuccess(() ->
-                                    Component.literal("enabled = " + Config.ENABLED.get()), false);
+                                    Component.literal("bucket = " + Config.ENABLED.get()), false);
                             return 1;
                         })
                         .then(net.minecraft.commands.Commands.argument("enabled", BoolArgumentType.bool())
                                 .suggests(WarashiCommands::suggestBoolean)
                                 .executes(context -> {
-                                    Config.ENABLED.set(BoolArgumentType.getBool(context, "enabled"));
+                                    boolean enabled = BoolArgumentType.getBool(context, "enabled");
+                                    Config.ENABLED.set(enabled);
                                     Config.SPEC.save();
+                                    if (!enabled) {
+                                        context.getSource().getServer().getAllLevels()
+                                                .forEach(TicketPauseUtil::clearAutoPausedTickets);
+                                    }
 
                                     context.getSource().sendSuccess(() ->
-                                            Component.literal("enabled set to " + Config.ENABLED.get()), false);
+                                            Component.literal("bucket set to " + Config.ENABLED.get()), false);
                                     return 1;
                                 })
                         )

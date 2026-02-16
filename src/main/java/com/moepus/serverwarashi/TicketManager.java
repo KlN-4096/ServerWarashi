@@ -1,6 +1,7 @@
 package com.moepus.serverwarashi;
 
 import com.moepus.serverwarashi.mixin.DistanceManagerAccessor;
+import com.moepus.serverwarashi.utils.TicketPauseUtil;
 import it.unimi.dsi.fastutil.longs.*;
 import net.minecraft.server.level.DistanceManager;
 import net.minecraft.server.level.ServerLevel;
@@ -30,22 +31,25 @@ public class TicketManager {
 
     @SubscribeEvent
     public static void onLevelTickPre(LevelTickEvent.Pre event) {
-        if (!Config.ENABLED.get()) return;
-
         Level level = event.getLevel();
         if (level.isClientSide) return;
 
         if (level instanceof ServerLevel serverLevel) {
-            applyStoredManualPausedChunks(serverLevel);
+            if (age % Config.RUN_EVERY.get() == 0) {
+                TicketPauseUtil.applyStoredManualPausedChunks(serverLevel);
+            }
+            if (!Config.ENABLED.get()) return;
             processTickets(serverLevel);
         }
     }
 
 
     private static void processTickets(ServerLevel level) {
+        if (TicketPauseUtil.isAutoBucketingPaused(level)) {
+            return;
+        }
         if (age % Config.RUN_EVERY.get() != 0) return;
 
-        ManualPauseData manualData = ManualPauseData.get(level);
         DistanceManager distanceManager = level.getChunkSource().chunkMap.getDistanceManager();
         var tickets = ((DistanceManagerAccessor) distanceManager).getTickets().long2ObjectEntrySet();
 
@@ -53,7 +57,7 @@ public class TicketManager {
         List<TicketEntry> allTickets = new ArrayList<>();
         for (var entry : tickets) {
             long chunkPosLong = entry.getLongKey();
-            if (manualData.contains(chunkPosLong)) {
+            if (TicketPauseUtil.isManualPaused(level, chunkPosLong)) {
                 continue;
             }
             int chunkX = ChunkPos.getX(chunkPosLong);
@@ -72,7 +76,7 @@ public class TicketManager {
         if (Config.PAUSE_ALL_TICKETS.get()) {
             Long2BooleanOpenHashMap modifiedChunks = new Long2BooleanOpenHashMap();
             for (TicketEntry entry : allTickets) {
-                if (applyAutoPause(entry.ticket, true)) {
+                if (TicketPauseUtil.applyAutoPause(entry.ticket, true)) {
                     modifiedChunks.put(entry.chunkPos, false);
                 }
             }
@@ -91,8 +95,8 @@ public class TicketManager {
         for (int i = 0; i < buckets.size(); i++) {
             boolean isActive = (i == currentGroupIndex);
             for (TicketEntry entry : buckets.get(i)) {
-                if (applyAutoPause(entry.ticket, !isActive)) {
-                    modifiedChunks.putIfAbsent(entry.chunkPos, isActive);
+                if (TicketPauseUtil.applyAutoPause(entry.ticket, !isActive)) {
+                    modifiedChunks.computeIfAbsent(entry.chunkPos, k -> isActive);
                 }
             }
         }
@@ -103,77 +107,16 @@ public class TicketManager {
 
     private static void updateChunkLevel(DistanceManagerAccessor distanceManager, Long2BooleanOpenHashMap modifiedChunks) {
         for (long chunkPos : modifiedChunks.keySet()) {
-            boolean isDecreasing = modifiedChunks.get(chunkPos);
-            updateChunkLevel(distanceManager, chunkPos, isDecreasing);
-        }
-    }
-
-    public static void updateChunkLevel(DistanceManagerAccessor distanceManager, long chunkPos, boolean isDecreasing) {
-        var ticketSet = distanceManager.getTickets().get(chunkPos);
-        if (ticketSet != null) {
-            int newLevel = updateTicketSet(ticketSet);
-            distanceManager.getTicketTracker().update(chunkPos, newLevel, isDecreasing);
-            if (!ticketSet.isEmpty() && isDecreasing) {
-                distanceManager.getTickingTicketsTracker().update(chunkPos, newLevel, true);
-            }
-        }
-    }
-
-    private static void applyStoredManualPausedChunks(ServerLevel level) {
-        ManualPauseData manualData = ManualPauseData.get(level);
-        if (manualData.isEmpty()) {
-            return;
-        }
-        DistanceManager distanceManager = level.getChunkSource().chunkMap.getDistanceManager();
-        DistanceManagerAccessor accessor = (DistanceManagerAccessor) distanceManager;
-        Long2BooleanOpenHashMap modifiedChunks = new Long2BooleanOpenHashMap();
-        LongIterator iterator = manualData.iterator();
-        while (iterator.hasNext()) {
-            long chunkPos = iterator.nextLong();
-            SortedArraySet<Ticket<?>> ticketSet = accessor.getTickets().get(chunkPos);
-            if (ticketSet == null || ticketSet.isEmpty()) {
-                continue;
-            }
-            boolean changed = false;
-            for (Ticket<?> ticket : ticketSet) {
-                if (isSystemTicket(ticket)) {
-                    continue;
-                }
-                if (applyManualPause(ticket, true)) {
-                    changed = true;
+            var ticketSet = distanceManager.getTickets().get(chunkPos);
+            if (ticketSet != null) {
+                int newLevel = updateTicketSet(ticketSet);
+                boolean isDecreasing = modifiedChunks.get(chunkPos);
+                distanceManager.getTicketTracker().update(chunkPos, newLevel, isDecreasing);
+                if (!ticketSet.isEmpty() && isDecreasing) {
+                    distanceManager.getTickingTicketsTracker().update(chunkPos, newLevel, true);
                 }
             }
-            if (changed) {
-                modifiedChunks.put(chunkPos, false);
-            }
         }
-        if (!modifiedChunks.isEmpty()) {
-            updateChunkLevel(accessor, modifiedChunks);
-        }
-    }
-
-    public static boolean applyAutoPause(Ticket<?> ticket, boolean paused) {
-        return applyPauseReason(ticket, paused, IPauseableTicket.PAUSE_REASON_AUTO);
-    }
-
-    public static boolean applyManualPause(Ticket<?> ticket, boolean paused) {
-        return applyPauseReason(ticket, paused, IPauseableTicket.PAUSE_REASON_MANUAL);
-    }
-
-    private static boolean applyPauseReason(Ticket<?> ticket, boolean paused, int reasonMask) {
-        IPauseableTicket pauseable = (IPauseableTicket) (Object) ticket;
-        assert pauseable != null;
-        int before = pauseable.serverWarashi$getPauseMask();
-        int after = paused ? (before | reasonMask) : (before & ~reasonMask);
-        if (before == after) {
-            return false;
-        }
-        pauseable.serverWarashi$setPauseMask(after);
-        boolean needUpdate = pauseable.serverWarashi$needUpdate();
-        if (needUpdate) {
-            pauseable.serverWarashi$clearDirty();
-        }
-        return needUpdate;
     }
 
     private static int updateTicketSet(SortedArraySet<Ticket<?>> tickets) {
@@ -195,13 +138,15 @@ public class TicketManager {
         List<List<TicketEntry>> buckets = new ArrayList<>();
         List<TicketEntry> current = new ArrayList<>();
 
-        for (TicketEntry entry : allTickets) {
+        for (int i = 0; i < allTickets.size(); i++) {
+            TicketEntry entry = allTickets.get(i);
+
             if (current.size() < targetBucketSize) {
                 current.add(entry);
             } else {
                 boolean tooClose = false;
                 if (!current.isEmpty()) {
-                    long diff = entry.morton - current.getLast().morton;
+                    long diff = entry.morton - current.get(current.size() - 1).morton;
                     tooClose = (diff <= Config.PROXIMITY_THRESHOLD.get());
                 }
 

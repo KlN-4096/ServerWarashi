@@ -47,12 +47,10 @@ public final class ManualPauseData extends SavedData {
     /**
      * 移除手动暂停区块坐标。
      */
-    public boolean remove(long chunkPos) {
+    public void remove(long chunkPos) {
         if (pausedChunks.remove(chunkPos)) {
             setDirty();
-            return true;
         }
-        return false;
     }
 
     /**

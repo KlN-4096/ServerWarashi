@@ -36,10 +36,18 @@ public final class ChunkPerfCommands {
                         )
                 )
                 .then(net.minecraft.commands.Commands.literal("start")
-                        .then(net.minecraft.commands.Commands.argument("group", IntegerArgumentType.integer(0))
-                                .executes(ChunkPerfCommands::startPerfGroup)
-                                .then(net.minecraft.commands.Commands.argument("seconds", IntegerArgumentType.integer(1, 3600))
+                        .then(net.minecraft.commands.Commands.literal("group")
+                                .then(net.minecraft.commands.Commands.argument("group", IntegerArgumentType.integer(0))
                                         .executes(ChunkPerfCommands::startPerfGroup)
+                                        .then(net.minecraft.commands.Commands.argument("seconds", IntegerArgumentType.integer(1, 3600))
+                                                .executes(ChunkPerfCommands::startPerfGroup)
+                                        )
+                                )
+                        )
+                        .then(net.minecraft.commands.Commands.literal("all")
+                                .executes(ChunkPerfCommands::startAllGroups)
+                                .then(net.minecraft.commands.Commands.argument("seconds", IntegerArgumentType.integer(1, 3600))
+                                        .executes(ChunkPerfCommands::startAllGroups)
                                 )
                         )
                 )
@@ -114,6 +122,24 @@ public final class ChunkPerfCommands {
                 ChunkPerfManager.stop(context.getSource().getLevel()), false);
         return 1;
     }
+
+    /**
+     * 启动全分组性能分析会话或定时分析。
+     *
+     * @param context 命令上下文
+     * @return 命令结果
+     */
+    private static int startAllGroups(CommandContext<CommandSourceStack> context) {
+        int seconds = getOptionalSeconds(context);
+        context.getSource().sendSuccess(() -> {
+            if (seconds > 0) {
+                return ChunkPerfManager.startAll(context.getSource(), seconds);
+            }
+            return ChunkPerfManager.startAll(context.getSource().getLevel());
+        }, false);
+        return 1;
+    }
+
 
     private static int listGroups(CommandContext<CommandSourceStack> context,
                                   ChunkPerfTickets.PauseMode pauseMode,

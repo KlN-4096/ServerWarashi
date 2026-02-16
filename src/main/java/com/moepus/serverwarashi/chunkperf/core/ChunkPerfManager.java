@@ -4,6 +4,7 @@ import com.moepus.serverwarashi.chunkperf.core.cache.ChunkPerfGroupCache;
 import com.moepus.serverwarashi.chunkperf.core.session.ChunkPerfSessionController;
 import com.moepus.serverwarashi.chunkperf.ticket.ChunkPerfTicketController;
 import com.moepus.serverwarashi.chunkperf.ticket.ChunkPerfTickets;
+import com.moepus.serverwarashi.utils.TicketPauseUtil;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -63,6 +64,29 @@ public final class ChunkPerfManager {
     }
 
     /**
+     * 启动全分组性能分析会话。
+     *
+     * @param level 目标世界
+     */
+    public static Component startAll(ServerLevel level) {
+        return INSTANCE.sessionManager.startAll(level, 0, null);
+    }
+
+    /**
+     * 启动全分组性能分析会话。
+     *
+     * @param source     命令来源
+     * @param durationSec 持续秒数，{@code 0} 表示不启用定时分析
+     */
+    public static Component startAll(CommandSourceStack source, int durationSec) {
+        UUID playerId = null;
+        if (source.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp) {
+            playerId = sp.getUUID();
+        }
+        return INSTANCE.sessionManager.startAll(source.getLevel(), durationSec, playerId);
+    }
+
+    /**
      * 降低指定分组票据等级（暂停）。
      */
     public static Component lower(ServerLevel level, int groupIndex) {
@@ -80,6 +104,7 @@ public final class ChunkPerfManager {
      * 停止会话并生成报告。
      */
     public static Component stop(ServerLevel level) {
+        TicketPauseUtil.pauseAutoBucketing(level, false);
         return INSTANCE.sessionManager.stop(level);
     }
 

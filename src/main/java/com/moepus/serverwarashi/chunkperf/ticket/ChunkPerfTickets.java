@@ -111,6 +111,12 @@ public final class ChunkPerfTickets {
             if (ticket == null) continue;
 
             TicketOwner<?> owner = new TicketOwner<>(ticket, level);
+            String ownerName = owner.getName();
+            if ("unknown".equals(ownerName)
+                    || "Unknown block".equals(ownerName)
+                    || "Unknown entity".equals(ownerName)) {
+                continue;
+            }
             ownerMap.computeIfAbsent(owner, k -> new HashSet<>()).add(chunkPos);
         }
 
@@ -190,6 +196,10 @@ public final class ChunkPerfTickets {
         for (Ticket<?> ticket : tickets) {
             boolean paused = ((IPauseableTicket) (Object) ticket).serverWarashi$isPaused();
             if (!pauseMode.accept(paused)) {
+                continue;
+            }
+            int level = ((IPauseableTicket) (Object) ticket).serverWarashi$getLevel();
+            if (level > 33) {
                 continue;
             }
             return ticket;
