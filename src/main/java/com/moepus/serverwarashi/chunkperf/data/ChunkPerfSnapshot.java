@@ -1,4 +1,4 @@
-package com.moepus.serverwarashi.chunkperf.ticket;
+package com.moepus.serverwarashi.chunkperf.data;
 
 import com.moepus.serverwarashi.ChunkLoadInfo;
 import com.moepus.serverwarashi.IPauseableTicket;
@@ -8,6 +8,8 @@ import com.moepus.serverwarashi.mixin.EntitySectionStorageAccessor;
 import com.moepus.serverwarashi.mixin.PersistentEntitySectionManagerAccessor;
 import com.moepus.serverwarashi.mixin.ServerLevelAcessor;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
@@ -15,37 +17,63 @@ import net.minecraft.server.level.Ticket;
 import net.minecraft.util.SortedArraySet;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.entity.EntitySection;
 import net.minecraft.world.level.entity.EntitySectionStorage;
 import net.minecraft.world.level.entity.PersistentEntitySectionManager;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 票据统计与快照收集工具。
+ * ChunkPerf 运行期快照缓存与构建器。
+ * 该类在服务器运行期保持单实例，按维度缓存快照数据。
  */
-public final class ChunkPerfTickets {
-    private ChunkPerfTickets() {
+public class ChunkPerfSnapshot {
+    private final Map<ResourceKey<Level>, SnapshotData> dimensionSnapshots = new HashMap<>();
+
+    /**
+     * 票据分组条目：包含 owner 对应的区块集合与统计信息。
+     */
+    public record ChunkPerfGroupEntry(
+            TicketOwner<?> owner,
+            Set<Long> chunks,
+            OwnerStats stats
+    ) {
+        public String label() {
+            return owner.toString();
+        }
+    }
+
+    /**
+     * 单个拥有者统计。
+     */
+    public record OwnerStats(int chunkCount, int blockEntityCount, int entityCount) {
+    }
+
+    /**
+     * 维度快照视图（纯数据）。
+     */
+    public record SnapshotData(
+            List<ChunkPerfGroupEntry> groups,
+            HashMap<Long, ChunkLoadInfo> chunkLoadInfoMap
+    ) {
     }
 
     /**
      * 暂停状态过滤模式。
      */
     public enum PauseMode {
-        /**
-         * 仅未暂停。
-         */
         ACTIVE_ONLY,
-        /**
-         * 仅已暂停。
-         */
         PAUSED_ONLY,
-        /**
-         * 同时包含已暂停与未暂停。
-         */
         ALL;
 
         public boolean accept(boolean paused) {
@@ -61,41 +89,78 @@ public final class ChunkPerfTickets {
      * 统计排序模式。
      */
     public enum SortMode {
-        /**
-         * 按方块实体数量排序（默认）。
-         */
         BLOCK_ENTITY,
-        /**
-         * 按实体数量排序。
-         */
         ENTITY
     }
 
     /**
-     * 构建拥有者统计快照。
+     * 服务器启动完成后，按维度重建快照。
      */
-    public static OwnerStatsSnapshot collectOwnerStatsSnapshot(
+    public void rebuildAll(MinecraftServer server) {
+        dimensionSnapshots.clear();
+        for (ServerLevel level : server.getAllLevels()) {
+            rebuildLevel(level);
+        }
+    }
+
+    /**
+     * 重建单个维度快照。
+     */
+    public void rebuildLevel(ServerLevel level) {
+        SnapshotData snapshot = collectOwnerStatsSnapshot(level, PauseMode.ALL);
+        dimensionSnapshots.put(level.dimension(), snapshot);
+    }
+
+    /**
+     * 清理运行期缓存。
+     */
+    public void clear() {
+        dimensionSnapshots.clear();
+    }
+
+    /**
+     * 读取指定维度当前缓存的快照。
+     */
+    public SnapshotData getSnapshot(ResourceKey<Level> dimension) {
+        SnapshotData snapshot = dimensionSnapshots.get(dimension);
+        if (snapshot != null) {
+            return snapshot;
+        }
+        return new SnapshotData(List.of(), new HashMap<>());
+    }
+
+    /**
+     * 构建拥有者统计快照视图。
+     */
+    public static SnapshotData collectOwnerStatsSnapshot(
             ServerLevel level,
             PauseMode pauseMode
     ) {
         HashMap<TicketOwner<?>, Set<Long>> ownerMap =
                 collectTicketOwners(level, pauseMode);
         HashMap<Long, ChunkLoadInfo> chunkLoadInfoMap = new HashMap<>();
-        HashMap<TicketOwner<?>, OwnerStats> ownerStatsMap = new HashMap<>();
+        List<ChunkPerfGroupEntry> groups = List.of();
         if (!ownerMap.isEmpty()) {
             PersistentEntitySectionManager<Entity> entityManager = ((ServerLevelAcessor) level).getEntityManager();
             PersistentEntitySectionManagerAccessor entityAccessor = (PersistentEntitySectionManagerAccessor) entityManager;
             EntitySectionStorage<?> sectionStorage = entityAccessor.getSectionStorage();
             EntitySectionStorageAccessor sectionAccessor = (EntitySectionStorageAccessor) sectionStorage;
-            ownerStatsMap = collectOwnerStats(level, ownerMap, sectionAccessor, sectionStorage, chunkLoadInfoMap);
+            HashMap<TicketOwner<?>, OwnerStats> ownerStatsMap =
+                    collectOwnerStats(level, ownerMap, sectionAccessor, sectionStorage, chunkLoadInfoMap);
+            groups = sortOwnerStats(ownerStatsMap, SortMode.BLOCK_ENTITY).stream()
+                    .map(entry -> new ChunkPerfGroupEntry(
+                            entry.getKey(),
+                            ownerMap.get(entry.getKey()),
+                            entry.getValue()))
+                    .toList();
         }
-        return new OwnerStatsSnapshot(ownerMap, ownerStatsMap, chunkLoadInfoMap);
+        return new SnapshotData(groups, chunkLoadInfoMap);
     }
 
     /**
      * 收集票据拥有者及其区块集合。
      */
-    public static HashMap<TicketOwner<?>, Set<Long>> collectTicketOwners(
+    private static HashMap<TicketOwner<?>, Set<Long>> collectTicketOwners(
             ServerLevel level,
             PauseMode pauseMode
     ) {
@@ -126,7 +191,7 @@ public final class ChunkPerfTickets {
     /**
      * 汇总每个拥有者的统计信息。
      */
-    public static HashMap<TicketOwner<?>, OwnerStats> collectOwnerStats(
+    private static HashMap<TicketOwner<?>, OwnerStats> collectOwnerStats(
             ServerLevel level,
             HashMap<TicketOwner<?>, Set<Long>> ownerMap,
             EntitySectionStorageAccessor sectionAccessor,
@@ -172,7 +237,7 @@ public final class ChunkPerfTickets {
     /**
      * 按指定模式排序拥有者统计。
      */
-    public static List<Map.Entry<TicketOwner<?>, OwnerStats>> sortOwnerStats(
+    private static List<Map.Entry<TicketOwner<?>, OwnerStats>> sortOwnerStats(
             HashMap<TicketOwner<?>, OwnerStats> ownerStats,
             SortMode sortMode
     ) {
@@ -191,6 +256,9 @@ public final class ChunkPerfTickets {
         return entries;
     }
 
+    /**
+     * 从票据集合中选择一个符合暂停过滤条件的票据。
+     */
     private static Ticket<?> selectTicket(SortedArraySet<Ticket<?>> tickets,
                                           PauseMode pauseMode) {
         for (Ticket<?> ticket : tickets) {
@@ -205,29 +273,5 @@ public final class ChunkPerfTickets {
             return ticket;
         }
         return null;
-    }
-
-    /**
-     * 单个拥有者的统计数据。
-     *
-     * @param chunkCount       区块数量
-     * @param blockEntityCount 方块实体数量
-     * @param entityCount      实体数量
-     */
-    public record OwnerStats(int chunkCount, int blockEntityCount, int entityCount) {
-    }
-
-    /**
-     * 拥有者统计快照。
-     *
-     * @param ownerMap 拥有者与区块集合的映射
-     * @param ownerStats 拥有者统计数据（区块/实体/方块实体）
-     * @param chunkLoadInfoMap 区块维度的负载统计
-     */
-    public record OwnerStatsSnapshot(
-            HashMap<TicketOwner<?>, Set<Long>> ownerMap,
-            HashMap<TicketOwner<?>, OwnerStats> ownerStats,
-            HashMap<Long, ChunkLoadInfo> chunkLoadInfoMap
-    ) {
     }
 }

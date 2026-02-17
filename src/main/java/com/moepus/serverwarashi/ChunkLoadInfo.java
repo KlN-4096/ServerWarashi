@@ -1,6 +1,7 @@
 package com.moepus.serverwarashi;
 
-import com.moepus.serverwarashi.chunkperf.core.ChunkPerfManager;
+import com.moepus.serverwarashi.chunkperf.ChunkPerfManager;
+import com.moepus.serverwarashi.chunkperf.data.ChunkPerfSnapshot;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -50,7 +51,17 @@ public final class ChunkLoadInfo {
     }
 
     public static Component dumpTickets(ServerLevel level, boolean currentWorking, boolean saveCsv) {
-        return ChunkPerfManager.dumpTickets(level, currentWorking, saveCsv);
+        ChunkPerfSnapshot.PauseMode pauseMode = currentWorking
+                ? ChunkPerfSnapshot.PauseMode.ACTIVE_ONLY
+                : ChunkPerfSnapshot.PauseMode.ALL;
+        return ChunkPerfManager.listGroups(
+                level,
+                pauseMode,
+                "Dumped tickets:",
+                ChunkPerfSnapshot.SortMode.BLOCK_ENTITY,
+                false,
+                saveCsv
+        );
     }
 
 }

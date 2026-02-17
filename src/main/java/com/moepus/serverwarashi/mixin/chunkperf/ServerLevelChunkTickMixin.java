@@ -1,6 +1,6 @@
 package com.moepus.serverwarashi.mixin.chunkperf;
 
-import com.moepus.serverwarashi.chunkperf.core.ChunkPerfManager;
+import com.moepus.serverwarashi.chunkperf.ChunkPerfManager;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -45,8 +45,9 @@ public abstract class ServerLevelChunkTickMixin {
         long duration = System.nanoTime() - serverWarashi$chunkTickStart;
         ServerLevel level = (ServerLevel) (Object) this;
         ChunkPos pos = chunk.getPos();
-        if (ChunkPerfManager.shouldTrack(level, pos.getWorldPosition())) {
-            ChunkPerfManager.onChunkTick(level, pos, duration);
+        long sessionId = ChunkPerfManager.resolveTrackSessionId(level, pos.getWorldPosition());
+        if (sessionId >= 0L) {
+            ChunkPerfManager.onChunkTick(level, pos, duration, sessionId);
         }
     }
 }

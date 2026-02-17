@@ -1,7 +1,7 @@
-package com.moepus.serverwarashi.chunkperf.core;
+package com.moepus.serverwarashi.chunkperf;
 
 import com.moepus.serverwarashi.TicketOwner;
-import com.moepus.serverwarashi.chunkperf.ticket.ChunkPerfTickets;
+import com.moepus.serverwarashi.chunkperf.data.ChunkPerfSnapshot;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.ClickEvent;
@@ -13,6 +13,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,11 +31,6 @@ public final class ChunkPerfMessages {
     public static Component noTicketGroupsFound() {
         return Component.literal("No ticket groups found.");
     }
-
-    /**
-     * 没有已降低分组时的提示。
-     */
-    public static Component noLoweredTicketGroupsFound() {return Component.literal("No lowered ticket groups found.");}
 
     /**
      * 没有活动会话时的提示。
@@ -75,19 +71,19 @@ public final class ChunkPerfMessages {
     }
 
     /**
-     * 会话开始时的提示（{@code durationSec > 0} 表示定时分析）。
+     * 会话开始时的提示。
      */
-    public static Component sessionStarted(Component ownerComponent,
-                                    int groupIndex,
-                                    int chunkCount,
-                                    int blockEntityCount,
-                                    int entityCount,
-                                    int durationSec) {
-        String header = durationSec > 0
-                ? "Chunk perf analysis started (" + durationSec + "s) >\n"
-                : "Chunk perf session started >\n";
-        MutableComponent message = Component.literal(header)
+    public static Component sessionStarted(ResourceKey<Level> dimension,
+                                           Component ownerComponent,
+                                           int groupIndex,
+                                           int chunkCount,
+                                           int blockEntityCount,
+                                           int entityCount,
+                                           int durationSec) {
+        MutableComponent message = Component.literal("Chunk perf analysis started (" + durationSec + "s) >\n")
                 .withStyle(ChatFormatting.AQUA);
+        message = message.append(Component.literal("    ").withStyle(ChatFormatting.DARK_GRAY))
+                .append(Component.literal("Dimension=" + dimension.location() + "\n").withStyle(ChatFormatting.GRAY));
         message = message.append(Component.literal("    ").withStyle(ChatFormatting.DARK_GRAY))
                 .append(ownerComponent)
                 .append(Component.literal("\n").withStyle(ChatFormatting.DARK_GRAY));
@@ -96,10 +92,6 @@ public final class ChunkPerfMessages {
                         + ", BE=" + blockEntityCount
                         + ", E=" + entityCount
                         + ").\n").withStyle(ChatFormatting.GRAY));
-        if (durationSec == 0) {
-            message = message.append(Component.literal("    Use /warashi perf stop to end.\n")
-                    .withStyle(ChatFormatting.GRAY));
-        }
         return message;
     }
 
@@ -107,20 +99,14 @@ public final class ChunkPerfMessages {
      * 全分组分析开始提示。
      *
      * @param groupCount  分组数量
-     * @param durationSec 持续秒数，{@code 0} 表示不启用定时分析
+     * @param durationSec 持续秒数
      */
-    public static Component allGroupsAnalysisStarted(int groupCount, int durationSec) {
-        String header = durationSec > 0
-                ? "All group analysis started (" + durationSec + "s) >\n"
-                : "All group analysis started >\n";
-        MutableComponent message = Component.literal(header)
+    public static Component allGroupsAnalysisStarted(ResourceKey<Level> dimension, int groupCount, int durationSec) {
+        MutableComponent message = Component.literal("All group analysis started (" + durationSec + "s) >\n")
                 .withStyle(ChatFormatting.AQUA);
         message = message.append(Component.literal("    ").withStyle(ChatFormatting.DARK_GRAY))
-                .append(Component.literal("Groups=" + groupCount + "\n").withStyle(ChatFormatting.GRAY));
-        if (durationSec == 0) {
-            message = message.append(Component.literal("    Use /warashi perf stop to end.\n")
-                    .withStyle(ChatFormatting.GRAY));
-        }
+                .append(Component.literal("Dimension=" + dimension.location()
+                        + " | Groups=" + groupCount + "\n").withStyle(ChatFormatting.GRAY));
         return message;
     }
 
@@ -150,54 +136,49 @@ public final class ChunkPerfMessages {
     }
 
     /**
-     * 根据已有快照构建拥有者统计输出。
-     *
-     * @param header 输出标题文本
-     * @param snapshot 统计快照
-     * @param sortMode 排序模式
-     * @return 格式化后的消息组件
-     */
-    public static MutableComponent buildOwnerStatsComponent(
-            String header,
-            ChunkPerfTickets.OwnerStatsSnapshot snapshot,
-            ChunkPerfTickets.SortMode sortMode,
-            ChunkPerfTickets.PauseMode pauseMode,
-            boolean showActions,
-            Map<TicketOwner<?>, Integer> stableIndex
-    ) {
-        MutableComponent message = formatOwnerStatsToComponent(header, snapshot.ownerStats(), sortMode, pauseMode, showActions, stableIndex);
-        if (snapshot.ownerMap().isEmpty()) {
-            message.append(noTicketsFoundLine());
-        }
-        return message;
-    }
-
-    /**
      * 格式化拥有者统计到聊天消息。
      */
     public static MutableComponent formatOwnerStatsToComponent(
             String header,
-            HashMap<TicketOwner<?>, ChunkPerfTickets.OwnerStats> ownerStats,
-            ChunkPerfTickets.SortMode sortMode,
-            ChunkPerfTickets.PauseMode pauseMode,
+            ResourceKey<Level> dimension,
+            List<ChunkPerfSnapshot.ChunkPerfGroupEntry> groups,
+            ChunkPerfSnapshot.SortMode sortMode,
+            ChunkPerfSnapshot.PauseMode pauseMode,
             boolean showActions,
             Map<TicketOwner<?>, Integer> stableIndex
     ) {
-        MutableComponent root = Component.literal(header + "\n").withStyle(ChatFormatting.AQUA);
-        List<Map.Entry<TicketOwner<?>, ChunkPerfTickets.OwnerStats>> baseEntries =
-                ChunkPerfTickets.sortOwnerStats(ownerStats, ChunkPerfTickets.SortMode.BLOCK_ENTITY);
+        MutableComponent root = Component.literal(header + "\n").withStyle(ChatFormatting.AQUA)
+                .append(Component.literal("Dimension: " + dimension.location() + "\n").withStyle(ChatFormatting.GRAY));
+        if (groups.isEmpty()) {
+            return root.append(noTicketsFoundLine());
+        }
+        List<ChunkPerfSnapshot.ChunkPerfGroupEntry> baseEntries = groups.stream()
+                .sorted(Comparator
+                        .comparingInt((ChunkPerfSnapshot.ChunkPerfGroupEntry entry) -> entry.stats().blockEntityCount())
+                        .reversed()
+                        .thenComparing(entry -> entry.owner().toString()))
+                .toList();
         HashMap<TicketOwner<?>, Integer> baseIndex = new HashMap<>();
         for (int i = 0; i < baseEntries.size(); i++) {
-            baseIndex.put(baseEntries.get(i).getKey(), i);
+            baseIndex.put(baseEntries.get(i).owner(), i);
         }
 
-        List<Map.Entry<TicketOwner<?>, ChunkPerfTickets.OwnerStats>> entries =
-                ChunkPerfTickets.sortOwnerStats(ownerStats, sortMode);
-        boolean showRestore = pauseMode == ChunkPerfTickets.PauseMode.PAUSED_ONLY;
+        Comparator<ChunkPerfSnapshot.ChunkPerfGroupEntry> comparator = switch (sortMode) {
+            case ENTITY -> Comparator
+                    .comparingInt((ChunkPerfSnapshot.ChunkPerfGroupEntry entry) -> entry.stats().entityCount())
+                    .reversed()
+                    .thenComparing(entry -> entry.owner().toString());
+            case BLOCK_ENTITY -> Comparator
+                    .comparingInt((ChunkPerfSnapshot.ChunkPerfGroupEntry entry) -> entry.stats().blockEntityCount())
+                    .reversed()
+                    .thenComparing(entry -> entry.owner().toString());
+        };
+        List<ChunkPerfSnapshot.ChunkPerfGroupEntry> entries = groups.stream().sorted(comparator).toList();
+        boolean showRestore = pauseMode == ChunkPerfSnapshot.PauseMode.PAUSED_ONLY;
         for (int i = 0; i < entries.size(); i++) {
-            Map.Entry<TicketOwner<?>, ChunkPerfTickets.OwnerStats> entry = entries.get(i);
-            TicketOwner<?> owner = entry.getKey();
-            ChunkPerfTickets.OwnerStats stats = entry.getValue();
+            ChunkPerfSnapshot.ChunkPerfGroupEntry entry = entries.get(i);
+            TicketOwner<?> owner = entry.owner();
+            ChunkPerfSnapshot.OwnerStats stats = entry.stats();
             int groupIndex;
             if (stableIndex != null) {
                 groupIndex = stableIndex.getOrDefault(owner, baseIndex.getOrDefault(owner, i));
@@ -259,29 +240,89 @@ public final class ChunkPerfMessages {
     }
 
     /**
+     * 构建全分组性能分析报告。
+     */
+    public static MutableComponent buildGroupMsptReport(ResourceKey<Level> dimension,
+                                                        List<GroupMsptEntry> entries,
+                                                        long serverTickCount,
+                                                        Duration elapsed) {
+        double totalReportedMspt = 0.0;
+        MutableComponent root = Component.literal("Group MSPT Report\n")
+                .withStyle(ChatFormatting.AQUA)
+                .append(Component.literal("====================================\n").withStyle(ChatFormatting.DARK_GRAY))
+                .append(Component.literal("Target: " + dimension.location()
+                                + " | Groups=" + entries.size()
+                                + " | Elapsed=" + elapsed.toSeconds() + "s"
+                                + " | ServerTicks=" + serverTickCount + "\n")
+                        .withStyle(ChatFormatting.GRAY));
+        root = root.append(Component.literal("Note: groups with mspt < 0.01 are omitted.\n")
+                .withStyle(ChatFormatting.DARK_GRAY));
+        if (entries.isEmpty()) {
+            return root.append(noTicketsFoundLine());
+        }
+        for (GroupMsptEntry entry : entries) {
+            double totalMs = entry.totalNanos() / 1_000_000.0;
+            double mspt = serverTickCount == 0 ? 0.0 : totalMs / serverTickCount;
+            if (mspt < 0.01) {
+                continue;
+            }
+            totalReportedMspt += mspt;
+            MutableComponent line = Component.empty()
+                    .append(entry.owner().asComponent())
+                    .append(Component.literal(" ").withStyle(ChatFormatting.DARK_GRAY))
+                    .append(Component.literal("G" + entry.groupIndex() + ": ").withStyle(ChatFormatting.GRAY))
+                    .append(Component.literal(String.format("C=%d, BE=%d, E=%d",
+                                    entry.chunkCount(),
+                                    entry.blockEntityCount(),
+                                    entry.entityCount()))
+                            .withStyle(ChatFormatting.GRAY));
+            line = line.append(Component.literal(" "))
+                    .append(Component.literal(String.format("mspt=%.2f", mspt))
+                            .withStyle(ChatFormatting.GOLD));
+            line = line.append(Component.literal(" "))
+                    .append(Component.literal("[L]")
+                            .withStyle(Style.EMPTY
+                                    .withColor(ChatFormatting.RED)
+                                    .withHoverEvent(new HoverEvent(
+                                            HoverEvent.Action.SHOW_TEXT,
+                                            Component.literal("Lower ticket level for this group")
+                                    ))
+                                    .withClickEvent(new ClickEvent(
+                                            ClickEvent.Action.RUN_COMMAND,
+                                            "/warashi perf lower " + entry.groupIndex()
+                                    ))));
+            line = line.append(Component.literal("\n").withStyle(ChatFormatting.DARK_GRAY));
+            root = root.append(line);
+        }
+        root = root.append(Component.literal(String.format("Reported total mspt=%.2f\n", totalReportedMspt))
+                .withStyle(ChatFormatting.GOLD));
+        return root;
+    }
+
+    /**
      * 构建性能会话的最终报告。
      */
     public static Component buildReport(ResourceKey<Level> dimension,
-                                 int groupIndex,
-                                 String ownerLabel,
-                                 int chunkCount,
-                                 int blockEntityCount,
-                                 int entityCount,
-                                 long serverTickCount,
-                                 long beTotalNanos,
-                                 long beMaxNanos,
-                                 long beTickCount,
-                                 long entityTotalNanos,
-                                 long entityMaxNanos,
-                                 long entityTickCount,
-                                 long chunkTotalNanos,
-                                 long chunkMaxNanos,
-                                 long chunkTickCount,
-                                 Object2LongOpenHashMap<String> typeTotals,
-                                 Object2LongOpenHashMap<String> typeCounts,
-                                 Object2LongOpenHashMap<String> entityTotals,
-                                 Object2LongOpenHashMap<String> entityCounts,
-                                 Duration elapsed) {
+                                        int groupIndex,
+                                        String ownerLabel,
+                                        int chunkCount,
+                                        int blockEntityCount,
+                                        int entityCount,
+                                        long serverTickCount,
+                                        long beTotalNanos,
+                                        long beMaxNanos,
+                                        long beTickCount,
+                                        long entityTotalNanos,
+                                        long entityMaxNanos,
+                                        long entityTickCount,
+                                        long chunkTotalNanos,
+                                        long chunkMaxNanos,
+                                        long chunkTickCount,
+                                        Object2LongOpenHashMap<String> typeTotals,
+                                        Object2LongOpenHashMap<String> typeCounts,
+                                        Object2LongOpenHashMap<String> entityTotals,
+                                        Object2LongOpenHashMap<String> entityCounts,
+                                        Duration elapsed) {
         double beTotalMs = beTotalNanos / 1_000_000.0;
         double beMaxMs = beMaxNanos / 1_000_000.0;
         double entityTotalMs = entityTotalNanos / 1_000_000.0;
@@ -392,69 +433,12 @@ public final class ChunkPerfMessages {
                                  long beTotalNanos,
                                  long entityTotalNanos,
                                  long chunkTotalNanos) {
+        /**
+         * 计算三类耗时的总纳秒。
+         */
         public long totalNanos() {
             return beTotalNanos + entityTotalNanos + chunkTotalNanos;
         }
-    }
-
-    /**
-     * 构建全分组性能分析报告。
-     */
-    public static MutableComponent buildGroupMsptReport(ResourceKey<Level> dimension,
-                                                        List<GroupMsptEntry> entries,
-                                                        long serverTickCount,
-                                                        Duration elapsed) {
-        double totalReportedMspt = 0.0;
-        MutableComponent root = Component.literal("Group MSPT Report\n")
-                .withStyle(ChatFormatting.AQUA)
-                .append(Component.literal("====================================\n").withStyle(ChatFormatting.DARK_GRAY))
-                .append(Component.literal("Target: " + dimension.location()
-                                + " | Groups=" + entries.size()
-                                + " | Elapsed=" + elapsed.toSeconds() + "s"
-                                + " | ServerTicks=" + serverTickCount + "\n")
-                        .withStyle(ChatFormatting.GRAY));
-        root = root.append(Component.literal("Note: groups with mspt < 0.01 are omitted.\n")
-                .withStyle(ChatFormatting.DARK_GRAY));
-        if (entries.isEmpty()) {
-            return root.append(noTicketsFoundLine());
-        }
-        for (GroupMsptEntry entry : entries) {
-            double totalMs = entry.totalNanos() / 1_000_000.0;
-            double mspt = serverTickCount == 0 ? 0.0 : totalMs / serverTickCount;
-            if (mspt < 0.01) {
-                continue;
-            }
-            totalReportedMspt += mspt;
-            MutableComponent line = Component.empty()
-                    .append(entry.owner().asComponent())
-                    .append(Component.literal(" ").withStyle(ChatFormatting.DARK_GRAY))
-                    .append(Component.literal("G" + entry.groupIndex() + ": ").withStyle(ChatFormatting.GRAY))
-                    .append(Component.literal(String.format("C=%d, BE=%d, E=%d",
-                                    entry.chunkCount(),
-                                    entry.blockEntityCount(),
-                                    entry.entityCount()))
-                            .withStyle(ChatFormatting.GRAY));
-            line = line.append(Component.literal(" "))
-                    .append(Component.literal(String.format("mspt=%.2f", mspt))
-                            .withStyle(ChatFormatting.GOLD));
-            line = line.append(Component.literal(" "))
-                    .append(Component.literal("[L]")
-                            .withStyle(Style.EMPTY
-                                    .withColor(ChatFormatting.RED)
-                                    .withHoverEvent(new HoverEvent(
-                                            HoverEvent.Action.SHOW_TEXT,
-                                            Component.literal("Lower ticket level for this group")
-                                    ))
-                                    .withClickEvent(new ClickEvent(
-                                            ClickEvent.Action.RUN_COMMAND,
-                                            "/warashi perf lower " + entry.groupIndex()
-                                    ))));
-            line = line.append(Component.literal("\n").withStyle(ChatFormatting.DARK_GRAY));
-            root = root.append(line);
-        }
-        root = root.append(Component.literal(String.format("Reported total mspt=%.2f\n", totalReportedMspt))
-                .withStyle(ChatFormatting.GOLD));
-        return root;
     }
 
 }

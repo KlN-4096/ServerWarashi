@@ -1,16 +1,20 @@
-package com.moepus.serverwarashi.chunkperf.entry;
+package com.moepus.serverwarashi.chunkperf;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.moepus.serverwarashi.chunkperf.core.ChunkPerfManager;
-import com.moepus.serverwarashi.chunkperf.ticket.ChunkPerfTickets;
+import com.moepus.serverwarashi.chunkperf.data.ChunkPerfSnapshot;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.level.ServerPlayer;
+
+import java.util.UUID;
 
 /**
  * 注册 {@code /warashi perf} 子命令。
  */
 public final class ChunkPerfCommands {
+    private static final int DEFAULT_ANALYZE_SECONDS = 9999;
+
     private ChunkPerfCommands() {
     }
 
@@ -22,17 +26,17 @@ public final class ChunkPerfCommands {
     public static void register(LiteralArgumentBuilder<CommandSourceStack> root) {
         root.then(net.minecraft.commands.Commands.literal("perf")
                 .then(net.minecraft.commands.Commands.literal("list")
-                        .executes(context -> listGroups(context, ChunkPerfTickets.PauseMode.ACTIVE_ONLY, "Ticket groups:", ChunkPerfTickets.SortMode.BLOCK_ENTITY))
+                        .executes(context -> listGroups(context, ChunkPerfSnapshot.PauseMode.ACTIVE_ONLY, "Ticket groups:", ChunkPerfSnapshot.SortMode.BLOCK_ENTITY))
                         .then(net.minecraft.commands.Commands.literal("entity")
-                                .executes(context -> listGroups(context, ChunkPerfTickets.PauseMode.ACTIVE_ONLY, "Ticket groups:", ChunkPerfTickets.SortMode.ENTITY)))
+                                .executes(context -> listGroups(context, ChunkPerfSnapshot.PauseMode.ACTIVE_ONLY, "Ticket groups:", ChunkPerfSnapshot.SortMode.ENTITY)))
                         .then(net.minecraft.commands.Commands.literal("blockentity")
-                                .executes(context -> listGroups(context, ChunkPerfTickets.PauseMode.ACTIVE_ONLY, "Ticket groups:", ChunkPerfTickets.SortMode.BLOCK_ENTITY)))
+                                .executes(context -> listGroups(context, ChunkPerfSnapshot.PauseMode.ACTIVE_ONLY, "Ticket groups:", ChunkPerfSnapshot.SortMode.BLOCK_ENTITY)))
                         .then(net.minecraft.commands.Commands.literal("lowered")
-                                .executes(context -> listGroups(context, ChunkPerfTickets.PauseMode.PAUSED_ONLY, "Lowered ticket groups:", ChunkPerfTickets.SortMode.BLOCK_ENTITY))
+                                .executes(context -> listGroups(context, ChunkPerfSnapshot.PauseMode.PAUSED_ONLY, "Lowered ticket groups:", ChunkPerfSnapshot.SortMode.BLOCK_ENTITY))
                                 .then(net.minecraft.commands.Commands.literal("entity")
-                                        .executes(context -> listGroups(context, ChunkPerfTickets.PauseMode.PAUSED_ONLY, "Lowered ticket groups:", ChunkPerfTickets.SortMode.ENTITY)))
+                                        .executes(context -> listGroups(context, ChunkPerfSnapshot.PauseMode.PAUSED_ONLY, "Lowered ticket groups:", ChunkPerfSnapshot.SortMode.ENTITY)))
                                 .then(net.minecraft.commands.Commands.literal("blockentity")
-                                        .executes(context -> listGroups(context, ChunkPerfTickets.PauseMode.PAUSED_ONLY, "Lowered ticket groups:", ChunkPerfTickets.SortMode.BLOCK_ENTITY)))
+                                        .executes(context -> listGroups(context, ChunkPerfSnapshot.PauseMode.PAUSED_ONLY, "Lowered ticket groups:", ChunkPerfSnapshot.SortMode.BLOCK_ENTITY)))
                         )
                 )
                 .then(net.minecraft.commands.Commands.literal("start")
@@ -76,12 +80,9 @@ public final class ChunkPerfCommands {
     private static int startPerfGroup(CommandContext<CommandSourceStack> context) {
         int groupIndex = IntegerArgumentType.getInteger(context, "group");
         int seconds = getOptionalSeconds(context);
-        context.getSource().sendSuccess(() -> {
-            if (seconds > 0) {
-                return ChunkPerfManager.start(context.getSource(), groupIndex, seconds);
-            }
-            return ChunkPerfManager.start(context.getSource().getLevel(), groupIndex);
-        }, false);
+        UUID playerId = getPlayerId(context.getSource());
+        context.getSource().sendSuccess(() ->
+                ChunkPerfManager.start(context.getSource().getLevel(), groupIndex, seconds, playerId), false);
         return 1;
     }
 
@@ -131,37 +132,49 @@ public final class ChunkPerfCommands {
      */
     private static int startAllGroups(CommandContext<CommandSourceStack> context) {
         int seconds = getOptionalSeconds(context);
-        context.getSource().sendSuccess(() -> {
-            if (seconds > 0) {
-                return ChunkPerfManager.startAll(context.getSource(), seconds);
-            }
-            return ChunkPerfManager.startAll(context.getSource().getLevel());
-        }, false);
+        UUID playerId = getPlayerId(context.getSource());
+        context.getSource().sendSuccess(() ->
+                ChunkPerfManager.startAll(context.getSource().getLevel(), seconds, playerId), false);
         return 1;
     }
 
 
+    /**
+     * 列出分组并输出到聊天。
+     */
     private static int listGroups(CommandContext<CommandSourceStack> context,
-                                  ChunkPerfTickets.PauseMode pauseMode,
+                                  ChunkPerfSnapshot.PauseMode pauseMode,
                                   String header,
-                                  ChunkPerfTickets.SortMode sortMode) {
+                                  ChunkPerfSnapshot.SortMode sortMode) {
         context.getSource().sendSuccess(() ->
                 ChunkPerfManager.listGroups(
                         context.getSource().getLevel(),
                         pauseMode,
                         header,
-                        sortMode
+                        sortMode,
+                        true,
+                        false
                 ), false);
         return 1;
     }
 
     /**
-     * 读取可选的秒参数；不存在时返回 0。
+     * 读取可选的秒参数；不存在时返回默认秒数。
      */
     private static int getOptionalSeconds(CommandContext<CommandSourceStack> context) {
         if (context.getNodes().stream().noneMatch(node -> "seconds".equals(node.getNode().getName()))) {
-            return 0;
+            return DEFAULT_ANALYZE_SECONDS;
         }
         return IntegerArgumentType.getInteger(context, "seconds");
+    }
+
+    /**
+     * 获取触发者的玩家 ID（非玩家返回 null）。
+     */
+    private static UUID getPlayerId(CommandSourceStack source) {
+        if (source.getEntity() instanceof ServerPlayer sp) {
+            return sp.getUUID();
+        }
+        return null;
     }
 }

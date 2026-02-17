@@ -1,7 +1,6 @@
 package com.moepus.serverwarashi;
 
-import com.moepus.serverwarashi.chunkperf.entry.ChunkPerfCommands;
-import com.moepus.serverwarashi.utils.TicketPauseUtil;
+import com.moepus.serverwarashi.chunkperf.ChunkPerfCommands;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -36,7 +35,7 @@ public class WarashiCommands {
                                     Config.SPEC.save();
                                     if (!enabled) {
                                         context.getSource().getServer().getAllLevels()
-                                                .forEach(TicketPauseUtil::clearAutoPausedTickets);
+                                                .forEach(TicketManager::clearAutoPause);
                                     }
 
                                     context.getSource().sendSuccess(() ->

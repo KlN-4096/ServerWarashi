@@ -33,11 +33,7 @@ public class TicketOwner<OwnerType> {
             }
             if (owner instanceof BlockPos blockPos) {
                 BlockState blockState = level.getBlockState(blockPos);
-                if (blockState != null) {
-                    this.name = blockState.getBlock().toString();
-                } else {
-                    this.name = "Unknown block";
-                }
+                this.name = blockState.getBlock().toString();
                 this.pos = blockPos;
             } else if (owner instanceof UUID uuid) {
                 Entity entity = level.getEntity(uuid);

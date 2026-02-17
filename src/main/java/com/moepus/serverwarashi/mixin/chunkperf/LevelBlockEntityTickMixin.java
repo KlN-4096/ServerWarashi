@@ -2,7 +2,7 @@ package com.moepus.serverwarashi.mixin.chunkperf;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.moepus.serverwarashi.chunkperf.core.ChunkPerfManager;
+import com.moepus.serverwarashi.chunkperf.ChunkPerfManager;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.TickingBlockEntity;
 import org.spongepowered.asm.mixin.Final;
@@ -43,7 +43,8 @@ public abstract class LevelBlockEntityTickMixin {
             original.call(tickingBlockEntity);
             return;
         }
-        if (!ChunkPerfManager.shouldTrack(level, tickingBlockEntity.getPos())) {
+        long sessionId = ChunkPerfManager.resolveTrackSessionId(level, tickingBlockEntity.getPos());
+        if (sessionId < 0L) {
             original.call(tickingBlockEntity);
             return;
         }
@@ -51,6 +52,6 @@ public abstract class LevelBlockEntityTickMixin {
         long start = System.nanoTime();
         original.call(tickingBlockEntity);
         long duration = System.nanoTime() - start;
-        ChunkPerfManager.onEntityTick(level, tickingBlockEntity.getPos(), tickingBlockEntity.getType(), duration, true);
+        ChunkPerfManager.onEntityTick(level, tickingBlockEntity.getPos(), tickingBlockEntity.getType(), duration, true, sessionId);
     }
 }

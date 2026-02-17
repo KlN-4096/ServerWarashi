@@ -28,3 +28,5 @@ repo
 /spark-master/
 TODO.md
 /参考/
+/.gradle-user/
+/.gradle-user-home/
