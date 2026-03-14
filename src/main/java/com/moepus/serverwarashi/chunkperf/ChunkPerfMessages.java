@@ -1,6 +1,7 @@
 package com.moepus.serverwarashi.chunkperf;
 
 import com.moepus.serverwarashi.TicketOwner;
+import com.moepus.serverwarashi.chunkperf.data.ChunkPerfGroupView;
 import com.moepus.serverwarashi.chunkperf.data.ChunkPerfSnapshot;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.minecraft.ChatFormatting;
@@ -145,10 +146,15 @@ public final class ChunkPerfMessages {
             ChunkPerfSnapshot.SortMode sortMode,
             ChunkPerfSnapshot.PauseMode pauseMode,
             boolean showActions,
-            Map<TicketOwner<?>, Integer> stableIndex
+            Map<TicketOwner<?>, Integer> stableIndex,
+            Map<TicketOwner<?>, ChunkPerfGroupView.GroupPauseState> pauseStates
     ) {
         MutableComponent root = Component.literal(header + "\n").withStyle(ChatFormatting.AQUA)
                 .append(Component.literal("Dimension: " + dimension.location() + "\n").withStyle(ChatFormatting.GRAY));
+        if (pauseMode == ChunkPerfSnapshot.PauseMode.PAUSED_ONLY) {
+            root = root.append(Component.literal("Note: [R] only appears on manually paused groups.\n")
+                    .withStyle(ChatFormatting.DARK_GRAY));
+        }
         if (groups.isEmpty()) {
             return root.append(noTicketsFoundLine());
         }
@@ -179,6 +185,10 @@ public final class ChunkPerfMessages {
             ChunkPerfSnapshot.ChunkPerfGroupEntry entry = entries.get(i);
             TicketOwner<?> owner = entry.owner();
             ChunkPerfSnapshot.OwnerStats stats = entry.stats();
+            ChunkPerfGroupView.GroupPauseState pauseState = pauseStates.getOrDefault(
+                    owner,
+                    new ChunkPerfGroupView.GroupPauseState(false, false)
+            );
             int groupIndex;
             if (stableIndex != null) {
                 groupIndex = stableIndex.getOrDefault(owner, baseIndex.getOrDefault(owner, i));
@@ -192,20 +202,26 @@ public final class ChunkPerfMessages {
                     .append(Component.literal("C=" + stats.chunkCount() + " ").withStyle(ChatFormatting.BLUE))
                     .append(Component.literal("BE=" + stats.blockEntityCount() + " ").withStyle(ChatFormatting.GREEN))
                     .append(Component.literal("E=" + stats.entityCount() + " ").withStyle(ChatFormatting.YELLOW));
+            if (pauseState.isPaused()) {
+                line = line.append(Component.literal(" "))
+                        .append(Component.literal("P=" + pauseState.label()).withStyle(ChatFormatting.DARK_GRAY));
+            }
             if (showActions) {
                 if (showRestore) {
-                    line = line.append(Component.literal(" "))
-                            .append(Component.literal("[R]")
-                                    .withStyle(Style.EMPTY
-                                            .withColor(ChatFormatting.GREEN)
-                                            .withHoverEvent(new HoverEvent(
-                                                    HoverEvent.Action.SHOW_TEXT,
-                                                    Component.literal("Restore ticket level for this group")
-                                            ))
-                                            .withClickEvent(new ClickEvent(
-                                                    ClickEvent.Action.RUN_COMMAND,
-                                                    "/warashi perf restore " + groupIndex
-                                            ))));
+                    if (pauseState.canRestore()) {
+                        line = line.append(Component.literal(" "))
+                                .append(Component.literal("[R]")
+                                        .withStyle(Style.EMPTY
+                                                .withColor(ChatFormatting.GREEN)
+                                                .withHoverEvent(new HoverEvent(
+                                                        HoverEvent.Action.SHOW_TEXT,
+                                                        Component.literal("Restore manual ticket lowering for this group")
+                                                ))
+                                                .withClickEvent(new ClickEvent(
+                                                        ClickEvent.Action.RUN_COMMAND,
+                                                        "/warashi perf group restore " + groupIndex
+                                                ))));
+                    }
                 } else {
                     line = line.append(Component.literal(" "))
                             .append(Component.literal("[A]")
@@ -217,7 +233,7 @@ public final class ChunkPerfMessages {
                                             ))
                                             .withClickEvent(new ClickEvent(
                                                     ClickEvent.Action.RUN_COMMAND,
-                                                    "/warashi perf start group " + groupIndex + " 60"
+                                                    "/warashi perf analyze start group " + groupIndex + " 60"
                                             ))))
                             .append(Component.literal(" "))
                             .append(Component.literal("[L]")
@@ -229,7 +245,7 @@ public final class ChunkPerfMessages {
                                             ))
                                             .withClickEvent(new ClickEvent(
                                                     ClickEvent.Action.RUN_COMMAND,
-                                                    "/warashi perf lower " + groupIndex
+                                                    "/warashi perf group lower " + groupIndex
                                             ))));
                 }
             }
@@ -289,7 +305,7 @@ public final class ChunkPerfMessages {
                                     ))
                                     .withClickEvent(new ClickEvent(
                                             ClickEvent.Action.RUN_COMMAND,
-                                            "/warashi perf lower " + entry.groupIndex()
+                                            "/warashi perf group lower " + entry.groupIndex()
                                     ))));
             line = line.append(Component.literal("\n").withStyle(ChatFormatting.DARK_GRAY));
             root = root.append(line);
@@ -349,7 +365,7 @@ public final class ChunkPerfMessages {
                                 ))
                                 .withClickEvent(new ClickEvent(
                                         ClickEvent.Action.RUN_COMMAND,
-                                        "/warashi perf lower " + groupIndex
+                                        "/warashi perf group lower " + groupIndex
                                 ))))
                 .append(Component.literal("\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("Chunks: " + chunkCount
