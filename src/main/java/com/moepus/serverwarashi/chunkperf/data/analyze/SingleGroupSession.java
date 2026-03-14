@@ -6,6 +6,9 @@ import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * 性能会话的状态数据，仅保存采样过程中的累计值。
  * 单分组性能会话数据。
@@ -58,6 +61,14 @@ public final class SingleGroupSession extends GroupSession {
     public long chunkMaxNanos;
     // 各区块累计耗时（纳秒）。
     public final Long2LongOpenHashMap chunkTotals = new Long2LongOpenHashMap();
+    // 每个方块实体实例的最大单次耗时（纳秒）。
+    public final Object2LongOpenHashMap<String> blockEntitySpikeNanos = new Object2LongOpenHashMap<>();
+    // 方块实体实例展示标签。
+    public final Map<String, String> blockEntitySpikeLabels = new HashMap<>();
+    // 每个实体实例的最大单次耗时（纳秒）。
+    public final Object2LongOpenHashMap<String> entitySpikeNanos = new Object2LongOpenHashMap<>();
+    // 实体实例展示标签。
+    public final Map<String, String> entitySpikeLabels = new HashMap<>();
 
     /**
      * 创建单分组会话数据。

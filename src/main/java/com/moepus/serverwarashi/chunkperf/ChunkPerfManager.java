@@ -133,10 +133,12 @@ public final class ChunkPerfManager {
     public static void onEntityTick(Level level,
                                     BlockPos pos,
                                     String type,
+                                    String sourceId,
+                                    String sourceLabel,
                                     long durationNanos,
                                     boolean isBlockEntity,
                                     long sessionId) {
-        INSTANCE.sessionManager.onEntityTick(level, pos, type, durationNanos, isBlockEntity, sessionId);
+        INSTANCE.sessionManager.onEntityTick(level, pos, type, sourceId, sourceLabel, durationNanos, isBlockEntity, sessionId);
     }
 
     /**

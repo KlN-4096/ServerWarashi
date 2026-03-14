@@ -113,6 +113,8 @@ abstract class AbstractGroupAnalyzer<S extends GroupSession> {
     public final void onEntityTickById(Level level,
                                        BlockPos pos,
                                        String type,
+                                       String sourceId,
+                                       String sourceLabel,
                                        long durationNanos,
                                        boolean isBlockEntity,
                                        long sessionId) {
@@ -123,7 +125,7 @@ abstract class AbstractGroupAnalyzer<S extends GroupSession> {
         if (session == null) {
             return;
         }
-        recordEntityTick(session, ChunkPos.asLong(pos), type, durationNanos, isBlockEntity);
+        recordEntityTick(session, ChunkPos.asLong(pos), type, sourceId, sourceLabel, durationNanos, isBlockEntity);
     }
 
     public final void onChunkTickById(Level level, ChunkPos pos, long durationNanos, long sessionId) {
@@ -150,6 +152,8 @@ abstract class AbstractGroupAnalyzer<S extends GroupSession> {
     protected abstract void recordEntityTick(S session,
                                              long chunkPos,
                                              String type,
+                                             String sourceId,
+                                             String sourceLabel,
                                              long durationNanos,
                                              boolean isBlockEntity);
 

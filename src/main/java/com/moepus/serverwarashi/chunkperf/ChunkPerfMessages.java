@@ -25,6 +25,9 @@ import java.util.Map;
  * 构建性能分析相关的提示与报告消息。
  */
 public final class ChunkPerfMessages {
+    //spike 报告过滤阈值(即异常实体过滤阈值,0.05 ms)
+    private static final long SPIKE_MIN_NANOS = 50_000L;
+
     private ChunkPerfMessages() {
     }
 
@@ -334,7 +337,11 @@ public final class ChunkPerfMessages {
                                         long chunkTotalNanos,
                                         long chunkMaxNanos,
                                         Long2LongOpenHashMap chunkTotals,
+                                        Object2LongOpenHashMap<String> blockEntitySpikeNanos,
+                                        Map<String, String> blockEntitySpikeLabels,
                                         Object2LongOpenHashMap<String> typeTotals,
+                                        Object2LongOpenHashMap<String> entitySpikeNanos,
+                                        Map<String, String> entitySpikeLabels,
                                         Object2LongOpenHashMap<String> entityTotals,
                                         Duration elapsed) {
         double beTotalMs = beTotalNanos / 1_000_000.0;
@@ -411,6 +418,15 @@ public final class ChunkPerfMessages {
             }
         }
 
+        root = appendSpikeSection(
+                root,
+                "---- spike block entities ----\n",
+                blockEntitySpikeNanos,
+                blockEntitySpikeLabels,
+                ChatFormatting.DARK_GREEN,
+                ChatFormatting.GREEN
+        );
+
         if (!typeTotals.isEmpty()) {
             var topBe = typeTotals.object2LongEntrySet().stream()
                     .sorted((a, b) -> Long.compare(b.getLongValue(), a.getLongValue()))
@@ -431,6 +447,15 @@ public final class ChunkPerfMessages {
                         entry.getKey(), typeMspt)).withStyle(ChatFormatting.GREEN));
             }
         }
+
+        root = appendSpikeSection(
+                root,
+                "---- spike entities ----\n",
+                entitySpikeNanos,
+                entitySpikeLabels,
+                ChatFormatting.GOLD,
+                ChatFormatting.YELLOW
+        );
 
         if (!entityTotals.isEmpty()) {
             var topEntities = entityTotals.object2LongEntrySet().stream()
@@ -453,6 +478,33 @@ public final class ChunkPerfMessages {
             }
         }
 
+        return root;
+    }
+
+    private static MutableComponent appendSpikeSection(MutableComponent root,
+                                                       String header,
+                                                       Object2LongOpenHashMap<String> spikeNanos,
+                                                       Map<String, String> spikeLabels,
+                                                       ChatFormatting headerColor,
+                                                       ChatFormatting lineColor) {
+        if (spikeNanos.isEmpty()) {
+            return root;
+        }
+        var topSpikes = spikeNanos.object2LongEntrySet().stream()
+                .filter(entry -> entry.getLongValue() >= SPIKE_MIN_NANOS)
+                .sorted((a, b) -> Long.compare(b.getLongValue(), a.getLongValue()))
+                .limit(5)
+                .toList();
+        if (topSpikes.isEmpty()) {
+            return root;
+        }
+        root = root.append(Component.literal(header).withStyle(headerColor));
+        for (var entry : topSpikes) {
+            double maxMs = entry.getLongValue() / 1_000_000.0;
+            String label = spikeLabels.getOrDefault(entry.getKey(), entry.getKey());
+            root = root.append(Component.literal(String.format(" - %s (max=%.3fms)\n", label, maxMs))
+                    .withStyle(lineColor));
+        }
         return root;
     }
 

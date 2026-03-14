@@ -73,6 +73,8 @@ public final class AnalyzeAllGroup extends AbstractGroupAnalyzer<AllGroupSession
     protected void recordEntityTick(AllGroupSession session,
                                     long chunkPos,
                                     String type,
+                                    String sourceId,
+                                    String sourceLabel,
                                     long durationNanos,
                                     boolean isBlockEntity) {
         int groupIndex = resolveGroupIndex(session, chunkPos);

@@ -1,6 +1,7 @@
 package com.moepus.serverwarashi;
 
 import com.moepus.serverwarashi.chunkperf.ChunkPerfCommands;
+import com.moepus.serverwarashi.chunkperf.data.ChunkPerfSnapshot;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -98,10 +99,7 @@ public class WarashiCommands {
                                 )
                         )
                         .then(net.minecraft.commands.Commands.literal("dump")
-                                .executes(context -> DumpTickets(context, false))
-                                .then(net.minecraft.commands.Commands.literal("currentWorking")
-                                        .executes(context -> DumpTickets(context, true))
-                                )
+                                .executes(context -> dumpTickets(context, ChunkPerfSnapshot.PauseMode.ALL))
                         )
                 );
         ChunkPerfCommands.register(root);
@@ -113,8 +111,11 @@ public class WarashiCommands {
         return SharedSuggestionProvider.suggest(List.of("true", "false"), builder);
     }
 
-    private static int DumpTickets(CommandContext<CommandSourceStack> context, boolean currentWorking) {
-        context.getSource().sendSuccess(() -> ChunkLoadInfo.dumpTickets(context.getSource().getLevel(), currentWorking, true), true);
+    private static int dumpTickets(CommandContext<CommandSourceStack> context,
+                                   ChunkPerfSnapshot.PauseMode pauseMode) {
+        context.getSource().sendSuccess(() ->
+                ChunkLoadInfo.dumpTickets(context.getSource().getLevel(), pauseMode, true), true);
         return 1;
     }
+
 }

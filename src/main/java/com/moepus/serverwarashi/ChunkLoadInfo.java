@@ -50,10 +50,9 @@ public final class ChunkLoadInfo {
         }
     }
 
-    public static Component dumpTickets(ServerLevel level, boolean currentWorking, boolean saveCsv) {
-        ChunkPerfSnapshot.PauseMode pauseMode = currentWorking
-                ? ChunkPerfSnapshot.PauseMode.ACTIVE_ONLY
-                : ChunkPerfSnapshot.PauseMode.ALL;
+    public static Component dumpTickets(ServerLevel level,
+                                        ChunkPerfSnapshot.PauseMode pauseMode,
+                                        boolean saveCsv) {
         return ChunkPerfManager.listGroups(
                 level,
                 pauseMode,

@@ -84,13 +84,15 @@ public final class ChunkPerfSessionController {
     public void onEntityTick(Level level,
                              BlockPos pos,
                              String type,
+                             String sourceId,
+                             String sourceLabel,
                              long durationNanos,
                              boolean isBlockEntity,
                              long sessionId) {
         if (activeTracker == null || sessionId < 0L || sessionId != activeSessionId) {
             return;
         }
-        activeTracker.onEntityTickById(level, pos, type, durationNanos, isBlockEntity, sessionId);
+        activeTracker.onEntityTickById(level, pos, type, sourceId, sourceLabel, durationNanos, isBlockEntity, sessionId);
     }
 
     public void onChunkTick(Level level, ChunkPos pos, long durationNanos, long sessionId) {

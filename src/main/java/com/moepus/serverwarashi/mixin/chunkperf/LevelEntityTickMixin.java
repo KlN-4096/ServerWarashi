@@ -3,11 +3,13 @@ package com.moepus.serverwarashi.mixin.chunkperf;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.moepus.serverwarashi.chunkperf.ChunkPerfManager;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 
 import java.util.function.Consumer;
@@ -43,7 +45,11 @@ public abstract class LevelEntityTickMixin {
         }
 
         Level level = (Level) (Object) this;
-        long sessionId = ChunkPerfManager.resolveTrackSessionId(level, mcEntity.blockPosition());
+        BlockPos entityPos = mcEntity.blockPosition();
+        String entityType = mcEntity.getType().toString();
+        String entityId = mcEntity.getUUID().toString();
+        String entityLabel = serverWarashi$formatEntityLabel(entityType, entityId, entityPos);
+        long sessionId = ChunkPerfManager.resolveTrackSessionId(level, entityPos);
         if (sessionId < 0L) {
             original.call(consumer, entity);
             return;
@@ -52,6 +58,24 @@ public abstract class LevelEntityTickMixin {
         long start = System.nanoTime();
         original.call(consumer, entity);
         long duration = System.nanoTime() - start;
-        ChunkPerfManager.onEntityTick(level, mcEntity.blockPosition(), mcEntity.getType().toString(), duration, false, sessionId);
+        ChunkPerfManager.onEntityTick(
+                level,
+                entityPos,
+                entityType,
+                entityId,
+                entityLabel,
+                duration,
+                false,
+                sessionId
+        );
+    }
+
+    @Unique
+    private static String serverWarashi$formatEntityLabel(String entityType,
+                                                          String entityId,
+                                                          BlockPos pos) {
+        String uuid = entityId;
+        String shortUuid = uuid.length() > 8 ? uuid.substring(0, 8) : uuid;
+        return entityType + "#" + shortUuid + "@(" + pos.getX() + "," + pos.getY() + "," + pos.getZ() + ")";
     }
 }

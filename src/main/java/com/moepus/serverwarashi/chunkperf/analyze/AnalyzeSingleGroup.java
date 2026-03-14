@@ -91,12 +91,14 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
     protected void recordEntityTick(SingleGroupSession session,
                                     long chunkPos,
                                     String type,
+                                    String sourceId,
+                                    String sourceLabel,
                                     long durationNanos,
                                     boolean isBlockEntity) {
         if (isBlockEntity) {
-            recordBlockEntity(session, chunkPos, type, durationNanos);
+            recordBlockEntity(session, chunkPos, type, sourceId, sourceLabel, durationNanos);
         } else {
-            recordEntity(session, chunkPos, type, durationNanos);
+            recordEntity(session, chunkPos, type, sourceId, sourceLabel, durationNanos);
         }
     }
 
@@ -129,7 +131,11 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
                 session.chunkTotalNanos,
                 session.chunkMaxNanos,
                 session.chunkTotals,
+                session.blockEntitySpikeNanos,
+                session.blockEntitySpikeLabels,
                 session.typeTotals,
+                session.entitySpikeNanos,
+                session.entitySpikeLabels,
                 session.entityTotals,
                 Duration.ofNanos(elapsedNanos)
         );
@@ -140,11 +146,17 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
         return ChunkPerfMessages.noActiveSession();
     }
 
-    private void recordBlockEntity(SingleGroupSession session, long chunkPos, String type, long durationNanos) {
+    private void recordBlockEntity(SingleGroupSession session,
+                                   long chunkPos,
+                                   String type,
+                                   String sourceId,
+                                   String sourceLabel,
+                                   long durationNanos) {
         if (durationNanos > session.beMaxNanos) {
             session.beMaxNanos = durationNanos;
         }
         session.typeTotals.addTo(type, durationNanos);
+        updateSpike(session.blockEntitySpikeNanos, session.blockEntitySpikeLabels, sourceId, sourceLabel, durationNanos);
         if (session.pendingBlockEntityChunkPos != chunkPos) {
             flushPendingBlockEntity(session);
             session.pendingBlockEntityChunkPos = chunkPos;
@@ -152,11 +164,17 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
         session.pendingBlockEntityNanos += durationNanos;
     }
 
-    private void recordEntity(SingleGroupSession session, long chunkPos, String type, long durationNanos) {
+    private void recordEntity(SingleGroupSession session,
+                              long chunkPos,
+                              String type,
+                              String sourceId,
+                              String sourceLabel,
+                              long durationNanos) {
         if (durationNanos > session.entityMaxNanos) {
             session.entityMaxNanos = durationNanos;
         }
         session.entityTotals.addTo(type, durationNanos);
+        updateSpike(session.entitySpikeNanos, session.entitySpikeLabels, sourceId, sourceLabel, durationNanos);
         if (session.pendingEntityChunkPos != chunkPos) {
             flushPendingEntity(session);
             session.pendingEntityChunkPos = chunkPos;
@@ -188,5 +206,18 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
         session.beTotalNanos += session.pendingBlockEntityNanos;
         session.pendingBlockEntityNanos = 0L;
         session.pendingBlockEntityChunkPos = Long.MIN_VALUE;
+    }
+
+    private void updateSpike(it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap<String> spikeNanos,
+                             java.util.Map<String, String> spikeLabels,
+                             String sourceId,
+                             String sourceLabel,
+                             long durationNanos) {
+        long current = spikeNanos.getLong(sourceId);
+        if (durationNanos <= current) {
+            return;
+        }
+        spikeNanos.put(sourceId, durationNanos);
+        spikeLabels.put(sourceId, sourceLabel);
     }
 }
