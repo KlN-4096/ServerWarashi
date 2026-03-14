@@ -130,7 +130,7 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
                 session.entityMaxNanos,
                 session.chunkTotalNanos,
                 session.chunkMaxNanos,
-                session.chunkTotals,
+                session.chunkLoadTotals,
                 session.blockEntitySpikeNanos,
                 session.blockEntitySpikeLabels,
                 session.typeTotals,
@@ -184,7 +184,6 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
 
     private void recordChunk(SingleGroupSession session, long chunkPos, long durationNanos) {
         session.chunkTotalNanos += durationNanos;
-        session.chunkTotals.addTo(chunkPos, durationNanos);
         if (durationNanos > session.chunkMaxNanos) {
             session.chunkMaxNanos = durationNanos;
         }
@@ -195,6 +194,9 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
             return;
         }
         session.entityTotalNanos += session.pendingEntityNanos;
+        if (session.pendingEntityChunkPos != Long.MIN_VALUE) {
+            session.chunkLoadTotals.addTo(session.pendingEntityChunkPos, session.pendingEntityNanos);
+        }
         session.pendingEntityNanos = 0L;
         session.pendingEntityChunkPos = Long.MIN_VALUE;
     }
@@ -204,6 +206,9 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
             return;
         }
         session.beTotalNanos += session.pendingBlockEntityNanos;
+        if (session.pendingBlockEntityChunkPos != Long.MIN_VALUE) {
+            session.chunkLoadTotals.addTo(session.pendingBlockEntityChunkPos, session.pendingBlockEntityNanos);
+        }
         session.pendingBlockEntityNanos = 0L;
         session.pendingBlockEntityChunkPos = Long.MIN_VALUE;
     }

@@ -59,8 +59,8 @@ public final class SingleGroupSession extends GroupSession {
     public long chunkTotalNanos;
     // 单次区块最大耗时（纳秒）。
     public long chunkMaxNanos;
-    // 各区块累计耗时（纳秒）。
-    public final Long2LongOpenHashMap chunkTotals = new Long2LongOpenHashMap();
+    // 各区块上的 BlockEntity + Entity 累计耗时（纳秒）。
+    public final Long2LongOpenHashMap chunkLoadTotals = new Long2LongOpenHashMap();
     // 每个方块实体实例的最大单次耗时（纳秒）。
     public final Object2LongOpenHashMap<String> blockEntitySpikeNanos = new Object2LongOpenHashMap<>();
     // 方块实体实例展示标签。

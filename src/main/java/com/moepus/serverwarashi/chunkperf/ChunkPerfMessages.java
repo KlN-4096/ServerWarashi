@@ -16,6 +16,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -336,7 +337,7 @@ public final class ChunkPerfMessages {
                                         long entityMaxNanos,
                                         long chunkTotalNanos,
                                         long chunkMaxNanos,
-                                        Long2LongOpenHashMap chunkTotals,
+                                        Long2LongOpenHashMap chunkLoadTotals,
                                         Object2LongOpenHashMap<String> blockEntitySpikeNanos,
                                         Map<String, String> blockEntitySpikeLabels,
                                         Object2LongOpenHashMap<String> typeTotals,
@@ -396,116 +397,122 @@ public final class ChunkPerfMessages {
                     chunkMspt, chunkMaxMs)).withStyle(ChatFormatting.BLUE));
         }
 
-        if (!chunkTotals.isEmpty()) {
-            var topChunks = chunkTotals.long2LongEntrySet().stream()
-                    .sorted((a, b) -> Long.compare(b.getLongValue(), a.getLongValue()))
-                    .limit(5)
-                    .toList();
-            boolean headerAdded = false;
-            for (var entry : topChunks) {
-                double chunkMs = entry.getLongValue() / 1_000_000.0;
-                double chunkEntryMspt = serverTickCount == 0 ? 0.0 : chunkMs / serverTickCount;
-                if (chunkEntryMspt < 0.01) {
-                    continue;
-                }
-                if (!headerAdded) {
-                    root = root.append(Component.literal("---- top chunks ----\n").withStyle(ChatFormatting.DARK_BLUE));
-                    headerAdded = true;
-                }
-                ChunkPos chunkPos = new ChunkPos(entry.getLongKey());
-                root = root.append(Component.literal(String.format(" - chunk(%d,%d) (mspt=%.2fms/tick)\n",
-                        chunkPos.x, chunkPos.z, chunkEntryMspt)).withStyle(ChatFormatting.BLUE));
-            }
-        }
-
-        root = appendSpikeSection(
+        root = appendCollapsedDetailSection(
                 root,
-                "---- spike block entities ----\n",
-                blockEntitySpikeNanos,
-                blockEntitySpikeLabels,
-                ChatFormatting.DARK_GREEN,
+                "top5 chunks",
+                buildTopChunkLines(chunkLoadTotals, serverTickCount),
+                ChatFormatting.BLUE
+        );
+
+        root = appendCollapsedDetailSection(
+                root,
+                "spike block entities",
+                buildSpikeLines(blockEntitySpikeNanos, blockEntitySpikeLabels),
                 ChatFormatting.GREEN
         );
 
-        if (!typeTotals.isEmpty()) {
-            var topBe = typeTotals.object2LongEntrySet().stream()
-                    .sorted((a, b) -> Long.compare(b.getLongValue(), a.getLongValue()))
-                    .limit(5)
-                    .toList();
-            boolean headerAdded = false;
-            for (var entry : topBe) {
-                double typeMs = entry.getLongValue() / 1_000_000.0;
-                double typeMspt = serverTickCount == 0 ? 0.0 : typeMs / serverTickCount;
-                if (typeMspt < 0.01) {
-                    continue;
-                }
-                if (!headerAdded) {
-                    root = root.append(Component.literal("---- top block entities ----\n").withStyle(ChatFormatting.DARK_GREEN));
-                    headerAdded = true;
-                }
-                root = root.append(Component.literal(String.format(" - %s (mspt=%.2fms/tick)\n",
-                        entry.getKey(), typeMspt)).withStyle(ChatFormatting.GREEN));
-            }
-        }
-
-        root = appendSpikeSection(
+        root = appendCollapsedDetailSection(
                 root,
-                "---- spike entities ----\n",
-                entitySpikeNanos,
-                entitySpikeLabels,
-                ChatFormatting.GOLD,
+                "top5 block entities",
+                buildTopTypeLines(typeTotals, serverTickCount),
+                ChatFormatting.GREEN
+        );
+
+        root = appendCollapsedDetailSection(
+                root,
+                "spike entities",
+                buildSpikeLines(entitySpikeNanos, entitySpikeLabels),
                 ChatFormatting.YELLOW
         );
 
-        if (!entityTotals.isEmpty()) {
-            var topEntities = entityTotals.object2LongEntrySet().stream()
-                    .sorted((a, b) -> Long.compare(b.getLongValue(), a.getLongValue()))
-                    .limit(5)
-                    .toList();
-            boolean headerAdded = false;
-            for (var entry : topEntities) {
-                double typeMs = entry.getLongValue() / 1_000_000.0;
-                double typeMspt = serverTickCount == 0 ? 0.0 : typeMs / serverTickCount;
-                if (typeMspt < 0.01) {
-                    continue;
-                }
-                if (!headerAdded) {
-                    root = root.append(Component.literal("---- top entities ----\n").withStyle(ChatFormatting.GOLD));
-                    headerAdded = true;
-                }
-                root = root.append(Component.literal(String.format(" - %s (mspt=%.2fms/tick)\n",
-                        entry.getKey(), typeMspt)).withStyle(ChatFormatting.YELLOW));
-            }
-        }
+        root = appendCollapsedDetailSection(
+                root,
+                "top5 entities",
+                buildTopTypeLines(entityTotals, serverTickCount),
+                ChatFormatting.YELLOW
+        );
 
         return root;
     }
 
-    private static MutableComponent appendSpikeSection(MutableComponent root,
-                                                       String header,
-                                                       Object2LongOpenHashMap<String> spikeNanos,
-                                                       Map<String, String> spikeLabels,
-                                                       ChatFormatting headerColor,
-                                                       ChatFormatting lineColor) {
-        if (spikeNanos.isEmpty()) {
+    private static MutableComponent appendCollapsedDetailSection(MutableComponent root,
+                                                                 String title,
+                                                                 List<String> lines,
+                                                                 ChatFormatting color) {
+        if (lines.isEmpty()) {
             return root;
         }
-        var topSpikes = spikeNanos.object2LongEntrySet().stream()
+        String details = title + "\n" + String.join("\n", lines);
+        MutableComponent copyable = Component.literal("[" + title + "]")
+                .withStyle(Style.EMPTY
+                        .withColor(color)
+                        .withHoverEvent(new HoverEvent(
+                                HoverEvent.Action.SHOW_TEXT,
+                                Component.literal(details + "\n\nClick to copy")
+                        ))
+                        .withClickEvent(new ClickEvent(
+                                ClickEvent.Action.COPY_TO_CLIPBOARD,
+                                details
+                        )));
+        return root.append(Component.literal(" - ").withStyle(ChatFormatting.DARK_GRAY))
+                .append(copyable)
+                .append(Component.literal("\n").withStyle(ChatFormatting.DARK_GRAY));
+    }
+
+    private static List<String> buildTopChunkLines(Long2LongOpenHashMap chunkLoadTotals, long serverTickCount) {
+        if (chunkLoadTotals.isEmpty()) {
+            return List.of();
+        }
+        List<String> lines = new ArrayList<>();
+        chunkLoadTotals.long2LongEntrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getLongValue(), a.getLongValue()))
+                .limit(5)
+                .forEach(entry -> {
+                    double chunkMs = entry.getLongValue() / 1_000_000.0;
+                    double chunkEntryMspt = serverTickCount == 0 ? 0.0 : chunkMs / serverTickCount;
+                    ChunkPos chunkPos = new ChunkPos(entry.getLongKey());
+                    lines.add(String.format("- chunk(%d,%d) (be+e mspt=%.2fms/tick)",
+                            chunkPos.x, chunkPos.z, chunkEntryMspt));
+                });
+        return lines;
+    }
+
+    private static List<String> buildSpikeLines(Object2LongOpenHashMap<String> spikeNanos,
+                                                Map<String, String> spikeLabels) {
+        if (spikeNanos.isEmpty()) {
+            return List.of();
+        }
+        List<String> lines = new ArrayList<>();
+        spikeNanos.object2LongEntrySet().stream()
                 .filter(entry -> entry.getLongValue() >= SPIKE_MIN_NANOS)
                 .sorted((a, b) -> Long.compare(b.getLongValue(), a.getLongValue()))
                 .limit(5)
-                .toList();
-        if (topSpikes.isEmpty()) {
-            return root;
+                .forEach(entry -> {
+                    double maxMs = entry.getLongValue() / 1_000_000.0;
+                    String label = spikeLabels.getOrDefault(entry.getKey(), entry.getKey());
+                    lines.add(String.format("- %s (max=%.3fms)", label, maxMs));
+                });
+        return lines;
+    }
+
+    private static List<String> buildTopTypeLines(Object2LongOpenHashMap<String> totals,
+                                                  long serverTickCount) {
+        if (totals.isEmpty()) {
+            return List.of();
         }
-        root = root.append(Component.literal(header).withStyle(headerColor));
-        for (var entry : topSpikes) {
-            double maxMs = entry.getLongValue() / 1_000_000.0;
-            String label = spikeLabels.getOrDefault(entry.getKey(), entry.getKey());
-            root = root.append(Component.literal(String.format(" - %s (max=%.3fms)\n", label, maxMs))
-                    .withStyle(lineColor));
-        }
-        return root;
+        List<String> lines = new ArrayList<>();
+        totals.object2LongEntrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getLongValue(), a.getLongValue()))
+                .limit(5)
+                .forEach(entry -> {
+                    double typeMs = entry.getLongValue() / 1_000_000.0;
+                    double typeMspt = serverTickCount == 0 ? 0.0 : typeMs / serverTickCount;
+                    if (typeMspt < 0.01) {
+                        return;
+                    }
+                    lines.add(String.format("- %s (mspt=%.2fms/tick)", entry.getKey(), typeMspt));
+                });
+        return lines;
     }
 
     /**
