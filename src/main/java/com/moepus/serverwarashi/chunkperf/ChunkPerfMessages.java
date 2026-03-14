@@ -199,9 +199,9 @@ public final class ChunkPerfMessages {
                     .append(owner.asComponent())
                     .append(Component.literal(" ").withStyle(ChatFormatting.DARK_GRAY))
                     .append(Component.literal("G" + groupIndex + ": ").withStyle(ChatFormatting.GRAY))
-                    .append(Component.literal("C=" + stats.chunkCount() + " ").withStyle(ChatFormatting.BLUE))
-                    .append(Component.literal("BE=" + stats.blockEntityCount() + " ").withStyle(ChatFormatting.GREEN))
-                    .append(Component.literal("E=" + stats.entityCount() + " ").withStyle(ChatFormatting.YELLOW));
+                    .append(Component.literal("C=" + stats.chunkCount() + " ").withStyle(ChatFormatting.GRAY))
+                    .append(Component.literal("BE=" + stats.blockEntityCount() + " ").withStyle(ChatFormatting.GRAY))
+                    .append(Component.literal("E=" + stats.entityCount() + " ").withStyle(ChatFormatting.GRAY));
             if (pauseState.isPaused()) {
                 line = line.append(Component.literal(" "))
                         .append(Component.literal("P=" + pauseState.label()).withStyle(ChatFormatting.DARK_GRAY));
@@ -327,17 +327,12 @@ public final class ChunkPerfMessages {
                                         long serverTickCount,
                                         long beTotalNanos,
                                         long beMaxNanos,
-                                        long beTickCount,
                                         long entityTotalNanos,
                                         long entityMaxNanos,
-                                        long entityTickCount,
                                         long chunkTotalNanos,
                                         long chunkMaxNanos,
-                                        long chunkTickCount,
                                         Object2LongOpenHashMap<String> typeTotals,
-                                        Object2LongOpenHashMap<String> typeCounts,
                                         Object2LongOpenHashMap<String> entityTotals,
-                                        Object2LongOpenHashMap<String> entityCounts,
                                         Duration elapsed) {
         double beTotalMs = beTotalNanos / 1_000_000.0;
         double beMaxMs = beMaxNanos / 1_000_000.0;
@@ -379,16 +374,16 @@ public final class ChunkPerfMessages {
                     serverTickCount, totalPerTickMs)).withStyle(ChatFormatting.GOLD));
         }
         if (beMspt >= 0.01) {
-            root = root.append(Component.literal(String.format("block entities (mspt=%.2fms/tick)>max=%.3fms, ticks=%d\n",
-                    beMspt, beMaxMs, beTickCount)).withStyle(ChatFormatting.GREEN));
+            root = root.append(Component.literal(String.format("block entities (mspt=%.2fms/tick)>max=%.3fms\n",
+                    beMspt, beMaxMs)).withStyle(ChatFormatting.GREEN));
         }
         if (entityMspt >= 0.01) {
-            root = root.append(Component.literal(String.format("entities (mspt=%.2fms/tick)>max=%.3fms, ticks=%d\n",
-                    entityMspt, entityMaxMs, entityTickCount)).withStyle(ChatFormatting.YELLOW));
+            root = root.append(Component.literal(String.format("entities (mspt=%.2fms/tick)>max=%.3fms\n",
+                    entityMspt, entityMaxMs)).withStyle(ChatFormatting.YELLOW));
         }
         if (chunkMspt >= 0.01) {
-            root = root.append(Component.literal(String.format("chunks (mspt=%.2fms/tick)>max=%.3fms, ticks=%d\n",
-                    chunkMspt, chunkMaxMs, chunkTickCount)).withStyle(ChatFormatting.BLUE));
+            root = root.append(Component.literal(String.format("chunks (mspt=%.2fms/tick)>max=%.3fms\n",
+                    chunkMspt, chunkMaxMs)).withStyle(ChatFormatting.BLUE));
         }
 
         if (!typeTotals.isEmpty()) {
@@ -398,7 +393,6 @@ public final class ChunkPerfMessages {
                     .toList();
             boolean headerAdded = false;
             for (var entry : topBe) {
-                long count = typeCounts.getLong(entry.getKey());
                 double typeMs = entry.getLongValue() / 1_000_000.0;
                 double typeMspt = serverTickCount == 0 ? 0.0 : typeMs / serverTickCount;
                 if (typeMspt < 0.01) {
@@ -408,8 +402,8 @@ public final class ChunkPerfMessages {
                     root = root.append(Component.literal("---- top block entities ----\n").withStyle(ChatFormatting.DARK_GREEN));
                     headerAdded = true;
                 }
-                root = root.append(Component.literal(String.format(" - %s (mspt=%.2fms/tick): ticks=%d\n",
-                        entry.getKey(), typeMspt, count)).withStyle(ChatFormatting.GREEN));
+                root = root.append(Component.literal(String.format(" - %s (mspt=%.2fms/tick)\n",
+                        entry.getKey(), typeMspt)).withStyle(ChatFormatting.GREEN));
             }
         }
 
@@ -420,7 +414,6 @@ public final class ChunkPerfMessages {
                     .toList();
             boolean headerAdded = false;
             for (var entry : topEntities) {
-                long count = entityCounts.getLong(entry.getKey());
                 double typeMs = entry.getLongValue() / 1_000_000.0;
                 double typeMspt = serverTickCount == 0 ? 0.0 : typeMs / serverTickCount;
                 if (typeMspt < 0.01) {
@@ -430,8 +423,8 @@ public final class ChunkPerfMessages {
                     root = root.append(Component.literal("---- top entities ----\n").withStyle(ChatFormatting.GOLD));
                     headerAdded = true;
                 }
-                root = root.append(Component.literal(String.format(" - %s (mspt=%.2fms/tick): ticks=%d\n",
-                        entry.getKey(), typeMspt, count)).withStyle(ChatFormatting.YELLOW));
+                root = root.append(Component.literal(String.format(" - %s (mspt=%.2fms/tick)\n",
+                        entry.getKey(), typeMspt)).withStyle(ChatFormatting.YELLOW));
             }
         }
 

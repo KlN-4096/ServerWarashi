@@ -24,12 +24,8 @@ public final class SingleGroupSession extends GroupSession {
 
     // 方块实体类型累计耗时（纳秒）。
     public final Object2LongOpenHashMap<String> typeTotals = new Object2LongOpenHashMap<>();
-    // 方块实体类型累计调用次数。
-    public final Object2LongOpenHashMap<String> typeCounts = new Object2LongOpenHashMap<>();
     // 实体类型累计耗时（纳秒）。
     public final Object2LongOpenHashMap<String> entityTotals = new Object2LongOpenHashMap<>();
-    // 实体类型累计调用次数。
-    public final Object2LongOpenHashMap<String> entityCounts = new Object2LongOpenHashMap<>();
 
     // 最近一次访问区块缓存：区块位置（ChunkPos#asLong）。
     public long lastChunkPos = Long.MIN_VALUE;
@@ -49,22 +45,16 @@ public final class SingleGroupSession extends GroupSession {
     public long beTotalNanos;
     // 单次方块实体最大耗时（纳秒）。
     public long beMaxNanos;
-    // 方块实体采样次数。
-    public long beTickCount;
 
     // 实体总耗时（纳秒）。
     public long entityTotalNanos;
     // 单次实体最大耗时（纳秒）。
     public long entityMaxNanos;
-    // 实体采样次数。
-    public long entityTickCount;
 
     // 区块总耗时（纳秒）。
     public long chunkTotalNanos;
     // 单次区块最大耗时（纳秒）。
     public long chunkMaxNanos;
-    // 区块采样次数。
-    public long chunkTickCount;
 
     /**
      * 创建单分组会话数据。

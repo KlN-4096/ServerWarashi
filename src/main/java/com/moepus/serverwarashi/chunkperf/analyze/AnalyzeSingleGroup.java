@@ -124,17 +124,12 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
                 session.serverTickCount,
                 session.beTotalNanos,
                 session.beMaxNanos,
-                session.beTickCount,
                 session.entityTotalNanos,
                 session.entityMaxNanos,
-                session.entityTickCount,
                 session.chunkTotalNanos,
                 session.chunkMaxNanos,
-                session.chunkTickCount,
                 session.typeTotals,
-                session.typeCounts,
                 session.entityTotals,
-                session.entityCounts,
                 Duration.ofNanos(elapsedNanos)
         );
     }
@@ -145,12 +140,10 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
     }
 
     private void recordBlockEntity(SingleGroupSession session, long chunkPos, String type, long durationNanos) {
-        session.beTickCount++;
         if (durationNanos > session.beMaxNanos) {
             session.beMaxNanos = durationNanos;
         }
         session.typeTotals.addTo(type, durationNanos);
-        session.typeCounts.addTo(type, 1);
         if (session.pendingBlockEntityChunkPos != chunkPos) {
             flushPendingBlockEntity(session);
             session.pendingBlockEntityChunkPos = chunkPos;
@@ -159,12 +152,10 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
     }
 
     private void recordEntity(SingleGroupSession session, long chunkPos, String type, long durationNanos) {
-        session.entityTickCount++;
         if (durationNanos > session.entityMaxNanos) {
             session.entityMaxNanos = durationNanos;
         }
         session.entityTotals.addTo(type, durationNanos);
-        session.entityCounts.addTo(type, 1);
         if (session.pendingEntityChunkPos != chunkPos) {
             flushPendingEntity(session);
             session.pendingEntityChunkPos = chunkPos;
@@ -173,7 +164,6 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
     }
 
     private void recordChunk(SingleGroupSession session, long durationNanos) {
-        session.chunkTickCount++;
         session.chunkTotalNanos += durationNanos;
         if (durationNanos > session.chunkMaxNanos) {
             session.chunkMaxNanos = durationNanos;

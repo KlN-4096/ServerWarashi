@@ -3,7 +3,6 @@ package com.moepus.serverwarashi.chunkperf.analyze;
 import com.moepus.serverwarashi.chunkperf.ChunkPerfMessages;
 import com.moepus.serverwarashi.chunkperf.data.ChunkPerfGroupIndex;
 import com.moepus.serverwarashi.chunkperf.data.ChunkPerfGroupView;
-import com.moepus.serverwarashi.chunkperf.data.ChunkPerfSnapshot;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
