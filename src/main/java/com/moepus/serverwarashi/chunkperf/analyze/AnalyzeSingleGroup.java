@@ -102,7 +102,7 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
 
     @Override
     protected void recordChunkTick(SingleGroupSession session, ChunkPos pos, long durationNanos) {
-        recordChunk(session, durationNanos);
+        recordChunk(session, pos.toLong(), durationNanos);
     }
 
     @Override
@@ -128,6 +128,7 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
                 session.entityMaxNanos,
                 session.chunkTotalNanos,
                 session.chunkMaxNanos,
+                session.chunkTotals,
                 session.typeTotals,
                 session.entityTotals,
                 Duration.ofNanos(elapsedNanos)
@@ -163,8 +164,9 @@ public final class AnalyzeSingleGroup extends AbstractGroupAnalyzer<SingleGroupS
         session.pendingEntityNanos += durationNanos;
     }
 
-    private void recordChunk(SingleGroupSession session, long durationNanos) {
+    private void recordChunk(SingleGroupSession session, long chunkPos, long durationNanos) {
         session.chunkTotalNanos += durationNanos;
+        session.chunkTotals.addTo(chunkPos, durationNanos);
         if (durationNanos > session.chunkMaxNanos) {
             session.chunkMaxNanos = durationNanos;
         }

@@ -1,5 +1,6 @@
 package com.moepus.serverwarashi.chunkperf.data.analyze;
 
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.minecraft.resources.ResourceKey;
@@ -55,6 +56,8 @@ public final class SingleGroupSession extends GroupSession {
     public long chunkTotalNanos;
     // 单次区块最大耗时（纳秒）。
     public long chunkMaxNanos;
+    // 各区块累计耗时（纳秒）。
+    public final Long2LongOpenHashMap chunkTotals = new Long2LongOpenHashMap();
 
     /**
      * 创建单分组会话数据。

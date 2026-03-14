@@ -3,6 +3,7 @@ package com.moepus.serverwarashi.chunkperf;
 import com.moepus.serverwarashi.TicketOwner;
 import com.moepus.serverwarashi.chunkperf.data.ChunkPerfGroupView;
 import com.moepus.serverwarashi.chunkperf.data.ChunkPerfSnapshot;
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.ClickEvent;
@@ -11,6 +12,7 @@ import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 
 import java.time.Duration;
@@ -331,6 +333,7 @@ public final class ChunkPerfMessages {
                                         long entityMaxNanos,
                                         long chunkTotalNanos,
                                         long chunkMaxNanos,
+                                        Long2LongOpenHashMap chunkTotals,
                                         Object2LongOpenHashMap<String> typeTotals,
                                         Object2LongOpenHashMap<String> entityTotals,
                                         Duration elapsed) {
@@ -384,6 +387,28 @@ public final class ChunkPerfMessages {
         if (chunkMspt >= 0.01) {
             root = root.append(Component.literal(String.format("chunks (mspt=%.2fms/tick)>max=%.3fms\n",
                     chunkMspt, chunkMaxMs)).withStyle(ChatFormatting.BLUE));
+        }
+
+        if (!chunkTotals.isEmpty()) {
+            var topChunks = chunkTotals.long2LongEntrySet().stream()
+                    .sorted((a, b) -> Long.compare(b.getLongValue(), a.getLongValue()))
+                    .limit(5)
+                    .toList();
+            boolean headerAdded = false;
+            for (var entry : topChunks) {
+                double chunkMs = entry.getLongValue() / 1_000_000.0;
+                double chunkEntryMspt = serverTickCount == 0 ? 0.0 : chunkMs / serverTickCount;
+                if (chunkEntryMspt < 0.01) {
+                    continue;
+                }
+                if (!headerAdded) {
+                    root = root.append(Component.literal("---- top chunks ----\n").withStyle(ChatFormatting.DARK_BLUE));
+                    headerAdded = true;
+                }
+                ChunkPos chunkPos = new ChunkPos(entry.getLongKey());
+                root = root.append(Component.literal(String.format(" - chunk(%d,%d) (mspt=%.2fms/tick)\n",
+                        chunkPos.x, chunkPos.z, chunkEntryMspt)).withStyle(ChatFormatting.BLUE));
+            }
         }
 
         if (!typeTotals.isEmpty()) {
