@@ -7,9 +7,12 @@
     "DistanceManagerAccessor",
     "EntitySectionStorageAccessor",
     "PersistentEntitySectionManagerAccessor",
-    "ServerLevelAcessor",
-    "ServerWatchdogMixin",
-    "TicketMixin"
+    "ServerLevelAccessor",
+    "chunkperf.LevelBlockEntityTickMixin",
+    "chunkperf.LevelEntityTickMixin",
+    "chunkperf.ServerLevelChunkTickMixin",
+    "TicketMixin",
+    "ServerWatchdogMixin"
   ],
   "client": [
   ],

@@ -2,7 +2,8 @@ package com.moepus.serverwarashi.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.moepus.serverwarashi.ChunkLoadInfo;
+import com.moepus.serverwarashi.common.group.ChunkGroupSnapshot;
+import com.moepus.serverwarashi.modules.performance.TicketPerfApi;
 import net.minecraft.CrashReport;
 import net.minecraft.ReportType;
 import net.minecraft.server.dedicated.DedicatedServer;
@@ -25,12 +26,12 @@ public class ServerWatchdogMixin {
         instance.saveToFile(path, type);
 
         try {
-            Files.writeString(path, "\n\n==== ServerWarashi Ticket Info ====", StandardOpenOption.APPEND);
+            Files.writeString(path, "\n\n==== Serverwarashi Ticket Info ====", StandardOpenOption.APPEND);
 
             // append ticket info to the crash report file
             for (var level : server.getAllLevels()) {
                 Files.writeString(path, "\n-- Dimension: " + level.dimension().location() + " --\n", StandardOpenOption.APPEND);
-                var ticketInfo = ChunkLoadInfo.dumpTickets(level, true, false);
+                var ticketInfo = TicketPerfApi.dumpTickets(level, ChunkGroupSnapshot.PauseMode.ACTIVE_ONLY, false);
                 Files.writeString(path, ticketInfo.toString(), StandardOpenOption.APPEND);
             }
         } catch (Exception ignored) {

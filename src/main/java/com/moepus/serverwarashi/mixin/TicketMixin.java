@@ -1,9 +1,7 @@
 package com.moepus.serverwarashi.mixin;
 
-import com.moepus.serverwarashi.IPauseableTicket;
-import com.moepus.serverwarashi.TicketManager;
+import com.moepus.serverwarashi.common.ticket.IPauseableTicket;
 import net.minecraft.server.level.Ticket;
-import net.minecraft.server.level.TicketType;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -19,36 +17,16 @@ public abstract class TicketMixin implements IPauseableTicket {
     @Final
     private int ticketLevel;
 
-    @Shadow
-    public abstract int getTicketLevel();
-
-    @Shadow
-    public abstract TicketType<?> getType();
-
     @Unique
-    private boolean serverWarashi$isPaused = false;
+    private int serverWarashi$pauseMask = 0;
 
     @Unique
     private boolean serverWarashi$dirty = false;
 
-    @Inject(method = "compareTo*", at = @At("HEAD"), cancellable = true)
-    private void onCompareTo(Ticket<?> other, CallbackInfoReturnable<Integer> cir) {
-        if (this.getType() == other.getType()) {
-            return;
-        }
-
-        boolean mePaused = this.serverWarashi$isPaused;
-        boolean themPaused = ((IPauseableTicket) (Object) other).serverWarashi$isPaused();
-
-        if (mePaused != themPaused) {
-            cir.setReturnValue(mePaused ? 1 : -1);
-        }
-    }
-
     @Override
     @Unique
     public boolean serverWarashi$isPaused() {
-        return serverWarashi$isPaused;
+        return serverWarashi$pauseMask != 0;
     }
 
     @Override
@@ -58,11 +36,17 @@ public abstract class TicketMixin implements IPauseableTicket {
 
     @Override
     @Unique
-    public void serverWarashi$setPaused(boolean paused) {
-        if (this.serverWarashi$isPaused != paused) {
+    public int serverWarashi$getPauseMask() {
+        return serverWarashi$pauseMask;
+    }
+
+    @Override
+    @Unique
+    public void serverWarashi$setPauseMask(int mask) {
+        if (this.serverWarashi$pauseMask != mask) {
             this.serverWarashi$dirty = true;
+            this.serverWarashi$pauseMask = mask;
         }
-        serverWarashi$isPaused = paused;
     }
 
     @Override
@@ -82,7 +66,7 @@ public abstract class TicketMixin implements IPauseableTicket {
 
     @Inject(method = "getTicketLevel", at = @At("HEAD"), cancellable = true)
     private void onGetTicketLevel(CallbackInfoReturnable<Integer> cir) {
-        if (serverWarashi$isPaused) {
+        if (serverWarashi$pauseMask != 0) {
             cir.setReturnValue(33);
         }
     }

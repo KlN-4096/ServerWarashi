@@ -1,4 +1,4 @@
-package com.moepus.serverwarashi;
+package com.moepus.serverwarashi.common.ticket;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.*;
@@ -33,11 +33,7 @@ public class TicketOwner<OwnerType> {
             }
             if (owner instanceof BlockPos blockPos) {
                 BlockState blockState = level.getBlockState(blockPos);
-                if (blockState != null) {
-                    this.name = blockState.getBlock().toString();
-                } else {
-                    this.name = "Unknown block";
-                }
+                this.name = blockState.getBlock().toString();
                 this.pos = blockPos;
             } else if (owner instanceof UUID uuid) {
                 Entity entity = level.getEntity(uuid);
@@ -105,13 +101,35 @@ public class TicketOwner<OwnerType> {
             return Component.literal(getName() + "@null");
         }
 
+        String displayName = getName();
+        String hoverName = null;
+        if (displayName.startsWith("Block{") && displayName.endsWith("}")) {
+            int start = "Block{".length();
+            int colon = displayName.indexOf(':', start);
+            if (colon > start) {
+                int end = displayName.length() - 1;
+                String modId = displayName.substring(start, colon);
+                String blockId = displayName.substring(colon + 1, end);
+                displayName = "Block{" + blockId + "}";
+                hoverName = modId;
+            }
+        }
+
         int x = pos.getX();
         int y = pos.getY();
         int z = pos.getZ();
 
         MutableComponent message = Component.empty();
         // 普通部分：名字 + @
-        Component base = Component.literal(getName() + "@");
+        Component base = Component.literal(displayName + "@");
+        if (hoverName != null) {
+            base = base.copy().setStyle(
+                    Style.EMPTY.withHoverEvent(new HoverEvent(
+                            HoverEvent.Action.SHOW_TEXT,
+                            Component.literal(hoverName)
+                    ))
+            );
+        }
 
         // 坐标部分：金色 + 可点击
         Component coord = Component.literal("(" + x + "," + y + "," + z + ")")

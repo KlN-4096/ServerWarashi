@@ -24,3 +24,17 @@ runs
 run-data
 
 repo
+/.vscode/
+/spark-master/
+TODO.md
+/参考/
+/.gradle-user/
+/.gradle-user-home/
+/.eclipse/
+/rule-tests/
+/utils/
+/rules/
+/sgconfig.yml
+/.serena/project.yml
+/.serena/.gitignore
+/.serena/

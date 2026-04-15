@@ -1,6 +1,8 @@
 package com.moepus.serverwarashi;
 
 import com.mojang.logging.LogUtils;
+import com.moepus.serverwarashi.command.WarashiCommands;
+import com.moepus.serverwarashi.config.Config;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -10,6 +12,11 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import org.slf4j.Logger;
 
+/**
+ * 模组主入口。
+ * 层级：入口层。
+ * 上游：NeoForge 加载器。下游：Config / WarashiCommands。
+ */
 @Mod(Serverwarashi.MODID)
 public class Serverwarashi {
     public static final String MODID = "serverwarashi";
