@@ -11,16 +11,11 @@ import java.util.List;
  */
 public final class ChunkGroupService {
     private static final ChunkGroupSnapshot SNAPSHOT_CACHE = new ChunkGroupSnapshot();
-    private static final ChunkGroupService INSTANCE = new ChunkGroupService();
 
     private ChunkGroupService() {
     }
 
     // --- 静态访问器 ---
-
-    public static ChunkGroupService instance() {
-        return INSTANCE;
-    }
 
     public static ChunkGroupSnapshot snapshotCache() {
         return SNAPSHOT_CACHE;
@@ -30,15 +25,25 @@ public final class ChunkGroupService {
 
     public static List<ChunkGroupSnapshot.ChunkGroupEntry> listGroups(ServerLevel level,
                                                                        ChunkGroupSnapshot.PauseMode pauseMode) {
-        INSTANCE.refresh(level);
-        return INSTANCE.groups(level, pauseMode);
+        refresh(level);
+        return groups(level, pauseMode);
     }
 
     public static GroupChunkLookup resolveAtChunk(ServerLevel level,
                                                     long chunkPos,
                                                     ChunkGroupSnapshot.PauseMode pauseMode) {
-        INSTANCE.refresh(level);
-        return INSTANCE.resolveGroupAtChunk(level, chunkPos, pauseMode);
+        refresh(level);
+        ChunkGroupSnapshot.SnapshotData snapshot = snapshot(level, pauseMode);
+        List<ChunkGroupSnapshot.ChunkGroupEntry> groups = snapshot.groups();
+        if (groups.isEmpty()) {
+            return new GroupChunkLookup(null, new LookupFailure(LookupFailureReason.NO_GROUPS));
+        }
+        for (ChunkGroupSnapshot.ChunkGroupEntry entry : groups) {
+            if (entry.chunks().contains(chunkPos)) {
+                return new GroupChunkLookup(entry, null);
+            }
+        }
+        return new GroupChunkLookup(null, new LookupFailure(LookupFailureReason.CHUNK_NOT_FOUND));
     }
 
     // --- 查询结果类型 ---
@@ -63,15 +68,15 @@ public final class ChunkGroupService {
     public record GroupChunkLookup(ChunkGroupSnapshot.ChunkGroupEntry entry, LookupFailure failure) {
     }
 
-    // --- 实例方法 ---
+    // --- 查询与刷新 ---
 
-    public void refresh(ServerLevel level) {
+    public static void refresh(ServerLevel level) {
         ChunkGroupSnapshot.SnapshotData snapshot = ChunkGroupCollector.collect(level, ChunkGroupSnapshot.PauseMode.ALL);
         SNAPSHOT_CACHE.putSnapshot(level.dimension(), snapshot);
     }
 
-    public ChunkGroupSnapshot.SnapshotData refreshSnapshot(ServerLevel level,
-                                                            ChunkGroupSnapshot.PauseMode pauseMode) {
+    public static ChunkGroupSnapshot.SnapshotData refreshSnapshot(ServerLevel level,
+                                                                   ChunkGroupSnapshot.PauseMode pauseMode) {
         if (pauseMode == ChunkGroupSnapshot.PauseMode.ALL) {
             refresh(level);
             return SNAPSHOT_CACHE.getSnapshot(level.dimension());
@@ -79,38 +84,22 @@ public final class ChunkGroupService {
         return ChunkGroupCollector.collect(level, pauseMode);
     }
 
-    public void refreshAll(MinecraftServer server) {
+    public static void refreshAll(MinecraftServer server) {
         for (ServerLevel level : server.getAllLevels()) {
             refresh(level);
         }
     }
 
-    public GroupChunkLookup resolveGroupAtChunk(ServerLevel level,
-                                                 long chunkPos,
-                                                 ChunkGroupSnapshot.PauseMode pauseMode) {
-        ChunkGroupSnapshot.SnapshotData snapshot = snapshot(level, pauseMode);
-        List<ChunkGroupSnapshot.ChunkGroupEntry> groups = snapshot.groups();
-        if (groups.isEmpty()) {
-            return new GroupChunkLookup(null, new LookupFailure(LookupFailureReason.NO_GROUPS));
-        }
-        for (ChunkGroupSnapshot.ChunkGroupEntry entry : groups) {
-            if (entry.chunks().contains(chunkPos)) {
-                return new GroupChunkLookup(entry, null);
-            }
-        }
-        return new GroupChunkLookup(null, new LookupFailure(LookupFailureReason.CHUNK_NOT_FOUND));
-    }
-
-    public ChunkGroupSnapshot.SnapshotData snapshot(ServerLevel level,
-                                                     ChunkGroupSnapshot.PauseMode pauseMode) {
+    public static ChunkGroupSnapshot.SnapshotData snapshot(ServerLevel level,
+                                                            ChunkGroupSnapshot.PauseMode pauseMode) {
         if (pauseMode == ChunkGroupSnapshot.PauseMode.ALL) {
             return SNAPSHOT_CACHE.getSnapshot(level.dimension());
         }
         return ChunkGroupCollector.collect(level, pauseMode);
     }
 
-    public List<ChunkGroupSnapshot.ChunkGroupEntry> groups(ServerLevel level,
-                                                             ChunkGroupSnapshot.PauseMode pauseMode) {
+    public static List<ChunkGroupSnapshot.ChunkGroupEntry> groups(ServerLevel level,
+                                                                  ChunkGroupSnapshot.PauseMode pauseMode) {
         return snapshot(level, pauseMode).groups();
     }
 }

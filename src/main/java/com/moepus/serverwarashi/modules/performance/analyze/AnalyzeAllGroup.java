@@ -20,8 +20,8 @@ import java.util.UUID;
  * 全分组性能会话跟踪器。
  */
 public final class AnalyzeAllGroup extends AnalyzeAbstractGroup<AllGroupSession> {
-    public AnalyzeAllGroup(ChunkGroupService queryService) {
-        super(queryService);
+    public AnalyzeAllGroup() {
+        super();
     }
 
     public Component startAll(ServerLevel level, int durationSec, UUID playerId, long sessionId) {
@@ -40,9 +40,8 @@ public final class AnalyzeAllGroup extends AnalyzeAbstractGroup<AllGroupSession>
     private StartResult<AllGroupSession> prepareStart(ServerLevel level,
                                                       int effectiveDuration,
                                                       long sessionId) {
-        queryService.refresh(level);
         List<ChunkGroupSnapshot.ChunkGroupEntry> groups =
-                queryService.groups(level, ChunkGroupSnapshot.PauseMode.ACTIVE_ONLY);
+                ChunkGroupService.listGroups(level, ChunkGroupSnapshot.PauseMode.ACTIVE_ONLY);
         if (groups.isEmpty()) {
             return startError(TicketPerfMessages.noTicketGroupsFound());
         }

@@ -1,6 +1,5 @@
 package com.moepus.serverwarashi.modules.performance.analyze;
 
-import com.moepus.serverwarashi.common.group.ChunkGroupService;
 import com.moepus.serverwarashi.modules.performance.report.TicketPerfMessages;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -23,9 +22,9 @@ public final class TicketPerfSessionController {
     private long nextSessionId = 1L;
     private long activeSessionId = -1L;
 
-    public TicketPerfSessionController(ChunkGroupService queryService) {
-        this.singleTracker = new AnalyzeSingleGroup(queryService);
-        this.allGroupTracker = new AnalyzeAllGroup(queryService);
+    public TicketPerfSessionController() {
+        this.singleTracker = new AnalyzeSingleGroup();
+        this.allGroupTracker = new AnalyzeAllGroup();
     }
 
     public Component start(ServerLevel sourceLevel,

@@ -1,6 +1,5 @@
 package com.moepus.serverwarashi.modules.performance.analyze;
 
-import com.moepus.serverwarashi.common.group.ChunkGroupService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
@@ -20,12 +19,10 @@ abstract class AnalyzeAbstractGroup<S extends GroupSession> {
     protected record StartResult<S extends GroupSession>(S session, Component response, Component error) {
     }
 
-    protected final ChunkGroupService queryService;
     private S activeSession;
     private TicketPerfSessionController.AutoAnalysis autoAnalysis;
 
-    protected AnalyzeAbstractGroup(ChunkGroupService queryService) {
-        this.queryService = queryService;
+    protected AnalyzeAbstractGroup() {
     }
 
     protected static <S extends GroupSession> StartResult<S> startSuccess(S session, Component response) {

@@ -22,8 +22,8 @@ import java.util.UUID;
  * 单分组性能会话跟踪器。
  */
 public final class AnalyzeSingleGroup extends AnalyzeAbstractGroup<SingleGroupSession> {
-    public AnalyzeSingleGroup(ChunkGroupService queryService) {
-        super(queryService);
+    public AnalyzeSingleGroup() {
+        super();
     }
 
     public Component start(ServerLevel sourceLevel,
@@ -47,9 +47,8 @@ public final class AnalyzeSingleGroup extends AnalyzeAbstractGroup<SingleGroupSe
                                                          BlockPos pos,
                                                          int effectiveDuration,
                                                          long sessionId) {
-        queryService.refresh(sourceLevel);
         long chunkPos = new ChunkPos(pos).toLong();
-        ChunkGroupService.GroupChunkLookup lookup = queryService.resolveGroupAtChunk(
+        ChunkGroupService.GroupChunkLookup lookup = ChunkGroupService.resolveAtChunk(
                 sourceLevel,
                 chunkPos,
                 ChunkGroupSnapshot.PauseMode.ALL

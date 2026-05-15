@@ -56,8 +56,7 @@ public final class TicketPerfGroupOutput {
                                        ChunkGroupSnapshot.SortMode sortMode,
                                        boolean showActions,
                                        boolean saveCsv) {
-        ChunkGroupService groupQueries = ChunkGroupService.instance();
-        ChunkGroupSnapshot.SnapshotData snapshot = groupQueries.refreshSnapshot(level, pauseMode);
+        ChunkGroupSnapshot.SnapshotData snapshot = ChunkGroupService.refreshSnapshot(level, pauseMode);
         List<ChunkGroupSnapshot.ChunkGroupEntry> groups = snapshot.groups();
         if (saveCsv && !snapshot.chunkLoadInfoMap().isEmpty()) {
             dumpToCsv(snapshot.chunkLoadInfoMap());

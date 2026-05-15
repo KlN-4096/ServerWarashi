@@ -18,7 +18,7 @@ import java.util.UUID;
  */
 public final class TicketPerfRuntime {
     static final TicketPerfSessionController SESSION_MANAGER =
-            new TicketPerfSessionController(ChunkGroupService.instance());
+            new TicketPerfSessionController();
 
     private TicketPerfRuntime() {
     }
@@ -27,7 +27,7 @@ public final class TicketPerfRuntime {
 
     public static void rebuildSnapshots(MinecraftServer server) {
         ChunkGroupService.snapshotCache().clear();
-        ChunkGroupService.instance().refreshAll(server);
+        ChunkGroupService.refreshAll(server);
     }
 
     public static void clearSnapshots() {
