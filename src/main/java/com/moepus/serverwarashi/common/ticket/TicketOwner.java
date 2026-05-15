@@ -10,7 +10,9 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.lang.reflect.Field;
+import java.util.Comparator;
 import java.util.Objects;
+
 import java.util.UUID;
 
 public class TicketOwner<OwnerType> {
@@ -46,17 +48,14 @@ public class TicketOwner<OwnerType> {
             }
         } else if (ticket.getType() == TicketType.PLAYER || this.name.equals("c2me_notickvd")) {
             owner = "player";
-            final double[] mostNearDistance = {Double.MAX_VALUE};
             if (key instanceof ChunkPos chunkPos) {
                 BlockPos ticketPos = chunkPos.getWorldPosition();
-                level.players().forEach(serverPlayer -> {
-                    double distance = serverPlayer.blockPosition().distSqr(ticketPos);
-                    if (distance < mostNearDistance[0]) {
-                        mostNearDistance[0] = distance;
-                        this.name = serverPlayer.getName().getString();
-                        pos = serverPlayer.blockPosition();
-                    }
-                });
+                level.players().stream()
+                        .min(Comparator.comparingDouble(p -> p.blockPosition().distSqr(ticketPos)))
+                        .ifPresent(p -> {
+                            this.name = p.getName().getString();
+                            this.pos = p.blockPosition();
+                        });
             }
         } else if (ticket.getType() == TicketType.START) {
             owner = "world_start";

@@ -1,6 +1,5 @@
 package com.moepus.serverwarashi.modules.idlefreeze;
 
-import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -216,15 +215,6 @@ public final class IdlePauseData extends SavedData {
                 }
             }
             return false;
-        }
-
-        /**
-         * 返回组内区块迭代器。
-         *
-         * @return 长整型区块迭代器
-         */
-        public LongIterator iterator() {
-            return chunks.iterator();
         }
 
         /**

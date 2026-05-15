@@ -97,14 +97,15 @@ public final class ChunkGroupCollector {
                 if (chunk != null) {
                     blockEntityCount = chunk.getBlockEntitiesPos().size();
                 }
-                int[] entityCount = {0};
-                sectionAccessor.invokeGetChunkSections(pos.x, pos.z).forEach(sectionIndex -> {
-                    EntitySection<?> section = sectionStorage.getSection(sectionIndex);
+                int entityCount = 0;
+                var sectionIterator = sectionAccessor.invokeGetChunkSections(pos.x, pos.z).iterator();
+                while (sectionIterator.hasNext()) {
+                    EntitySection<?> section = sectionStorage.getSection(sectionIterator.nextLong());
                     if (section != null) {
-                        entityCount[0] += section.size();
+                        entityCount += section.size();
                     }
-                });
-                chunkLoadInfoMap.put(chunkPos, new ChunkGroupSnapshot.ChunkLoadInfo(blockEntityCount, entityCount[0]));
+                }
+                chunkLoadInfoMap.put(chunkPos, new ChunkGroupSnapshot.ChunkLoadInfo(blockEntityCount, entityCount));
             }
         }
         return chunkLoadInfoMap;

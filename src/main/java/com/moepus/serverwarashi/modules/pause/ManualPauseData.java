@@ -1,6 +1,5 @@
 package com.moepus.serverwarashi.modules.pause;
 
-import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -64,10 +63,10 @@ public final class ManualPauseData extends SavedData {
     }
 
     /**
-     * 获取区块坐标迭代器。
+     * 返回已暂停区块的只读集合视图。
      */
-    public LongIterator iterator() {
-        return pausedChunks.iterator();
+    public LongOpenHashSet chunks() {
+        return pausedChunks;
     }
 
     public boolean needsReplay() {

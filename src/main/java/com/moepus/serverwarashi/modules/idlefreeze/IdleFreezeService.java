@@ -2,7 +2,6 @@ package com.moepus.serverwarashi.modules.idlefreeze;
 
 import com.moepus.serverwarashi.common.ticket.IPauseableTicket;
 import com.moepus.serverwarashi.common.ticket.TicketOwner;
-import com.moepus.serverwarashi.common.LongIterables;
 import com.moepus.serverwarashi.common.ticket.TicketPauseService;
 import com.moepus.serverwarashi.config.IdleFreezeConfig;
 import com.moepus.serverwarashi.common.group.ChunkGroupService;
@@ -36,7 +35,7 @@ public final class IdleFreezeService {
         for (IdlePauseData.FrozenGroup group : pauseData.groups()) {
             TicketPauseService.applyPauseReasonToChunks(
                     level,
-                    LongIterables.from(group.iterator()),
+                    group.chunks(),
                     true,
                     IPauseableTicket.PAUSE_REASON_IDLE
             );

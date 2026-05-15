@@ -1,6 +1,5 @@
 package com.moepus.serverwarashi.modules.pause;
 
-import com.moepus.serverwarashi.common.LongIterables;
 import com.moepus.serverwarashi.common.ticket.IPauseableTicket;
 import com.moepus.serverwarashi.common.ticket.TicketOwner;
 import com.moepus.serverwarashi.common.ticket.TicketPauseService;
@@ -97,7 +96,7 @@ public final class TicketPauseGroupService {
 
         TicketPauseService.applyPauseReasonToChunks(
                 level,
-                LongIterables.from(manualData.iterator()),
+                manualData.chunks(),
                 true,
                 IPauseableTicket.PAUSE_REASON_MANUAL
         );

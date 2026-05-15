@@ -54,16 +54,10 @@ public record TicketPauseGroupState(boolean manualPaused, boolean autoPaused, bo
         if (!isPaused()) {
             return "running";
         }
-        StringBuilder sb = new StringBuilder();
-        if (manualPaused) sb.append("manual");
-        if (autoPaused) {
-            if (!sb.isEmpty()) sb.append('+');
-            sb.append("auto");
-        }
-        if (idlePaused) {
-            if (!sb.isEmpty()) sb.append('+');
-            sb.append("idle");
-        }
-        return sb.toString();
+        var sj = new java.util.StringJoiner("+");
+        if (manualPaused) sj.add("manual");
+        if (autoPaused) sj.add("auto");
+        if (idlePaused) sj.add("idle");
+        return sj.toString();
     }
 }

@@ -7,7 +7,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
@@ -37,7 +36,6 @@ public final class ServerWarashiEvents {
     @SubscribeEvent
     public static void onServerTickPost(ServerTickEvent.Post event) {
         TicketPerfRuntime.tickSessions(event.getServer());
-        IdleFreezeRuntime.onServerTickPost(event.getServer());
     }
 
     @SubscribeEvent
@@ -55,16 +53,8 @@ public final class ServerWarashiEvents {
     }
 
     @SubscribeEvent
-    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) {
-            IdleFreezeRuntime.onPlayerLoggedOut(player);
-        }
-    }
-
-    @SubscribeEvent
     public static void onServerStopped(ServerStoppedEvent event) {
         TicketBucketRuntime.clearRuntimeState();
         TicketPerfRuntime.clearSnapshots();
-        IdleFreezeRuntime.clearRuntimeState();
     }
 }
