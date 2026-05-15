@@ -1,6 +1,5 @@
 package com.moepus.serverwarashi.modules.performance.analyze;
 
-import com.moepus.serverwarashi.common.group.ChunkGroupIndex;
 import com.moepus.serverwarashi.common.group.ChunkGroupService;
 import com.moepus.serverwarashi.common.group.ChunkGroupSnapshot;
 import com.moepus.serverwarashi.modules.performance.report.TicketPerfMessages;
@@ -21,11 +20,8 @@ import java.util.UUID;
  * 全分组性能会话跟踪器。
  */
 public final class AnalyzeAllGroup extends AnalyzeAbstractGroup<AllGroupSession> {
-    private final ChunkGroupIndex groupIndex;
-
-    public AnalyzeAllGroup(ChunkGroupService queryService, ChunkGroupIndex groupIndex) {
+    public AnalyzeAllGroup(ChunkGroupService queryService) {
         super(queryService);
-        this.groupIndex = groupIndex;
     }
 
     public Component startAll(ServerLevel level, int durationSec, UUID playerId, long sessionId) {
@@ -120,9 +116,7 @@ public final class AnalyzeAllGroup extends AnalyzeAbstractGroup<AllGroupSession>
         for (int i = 0; i < session.groups.size(); i++) {
             ChunkGroupSnapshot.ChunkGroupEntry entry = session.groups.get(i);
             ChunkGroupSnapshot.OwnerStats stats = entry.stats();
-            int stableIndex = groupIndex.getIndex(session.dimension, entry.owner());
             entries.add(new TicketPerfMessages.GroupMsptEntry(
-                    stableIndex,
                     entry.owner(),
                     stats.chunkCount(),
                     stats.blockEntityCount(),

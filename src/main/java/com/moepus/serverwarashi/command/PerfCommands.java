@@ -7,6 +7,8 @@ import com.mojang.brigadier.context.CommandContext;
 import com.moepus.serverwarashi.config.TicketPerfConfig;
 import com.moepus.serverwarashi.common.group.ChunkGroupSnapshot;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.UUID;
@@ -47,11 +49,17 @@ public final class PerfCommands {
                                                 .executes(PerfCommands::startAllGroups)
                                         )
                                 )
-                                .then(net.minecraft.commands.Commands.literal("group")
-                                        .then(net.minecraft.commands.Commands.argument("group", IntegerArgumentType.integer(0))
-                                                .executes(PerfCommands::startPerfGroup)
+                                .then(net.minecraft.commands.Commands.literal("here")
+                                        .executes(ctx -> startPerfHere(ctx, null))
+                                        .then(net.minecraft.commands.Commands.argument("seconds", IntegerArgumentType.integer(1, 3600))
+                                                .executes(ctx -> startPerfHere(ctx, "seconds"))
+                                        )
+                                )
+                                .then(net.minecraft.commands.Commands.literal("at")
+                                        .then(net.minecraft.commands.Commands.argument("pos", BlockPosArgument.blockPos())
+                                                .executes(ctx -> startPerfAt(ctx, null))
                                                 .then(net.minecraft.commands.Commands.argument("seconds", IntegerArgumentType.integer(1, 3600))
-                                                        .executes(PerfCommands::startPerfGroup)
+                                                        .executes(ctx -> startPerfAt(ctx, "seconds"))
                                                 )
                                         )
                                 )
@@ -63,14 +71,27 @@ public final class PerfCommands {
         );
     }
 
-    private static int startPerfGroup(CommandContext<CommandSourceStack> context) {
-        int groupIndex = IntegerArgumentType.getInteger(context, "group");
-        int seconds = getOptionalSeconds(context);
+    private static int startPerfHere(CommandContext<CommandSourceStack> context, String secondsArg) {
+        BlockPos pos = BlockPos.containing(context.getSource().getPosition());
+        return runStartAt(context, pos, secondsArg);
+    }
+
+    private static int startPerfAt(CommandContext<CommandSourceStack> context, String secondsArg) {
+        BlockPos pos = BlockPosArgument.getBlockPos(context, "pos");
+        return runStartAt(context, pos, secondsArg);
+    }
+
+    private static int runStartAt(CommandContext<CommandSourceStack> context,
+                                  BlockPos pos,
+                                  String secondsArg) {
+        int seconds = secondsArg == null
+                ? defaultAnalyzeSeconds()
+                : IntegerArgumentType.getInteger(context, secondsArg);
         UUID playerId = getPlayerId(context.getSource());
         context.getSource().sendSuccess(() ->
                 TicketPerfApi.start(
                         context.getSource().getLevel(),
-                        groupIndex,
+                        pos,
                         seconds,
                         playerId
                 ), false);

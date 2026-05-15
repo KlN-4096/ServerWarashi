@@ -1,6 +1,5 @@
 package com.moepus.serverwarashi.modules.performance.analyze;
 
-import com.moepus.serverwarashi.common.group.ChunkGroupIndex;
 import com.moepus.serverwarashi.common.group.ChunkGroupService;
 import com.moepus.serverwarashi.modules.performance.report.TicketPerfMessages;
 import net.minecraft.core.BlockPos;
@@ -24,21 +23,20 @@ public final class TicketPerfSessionController {
     private long nextSessionId = 1L;
     private long activeSessionId = -1L;
 
-    public TicketPerfSessionController(ChunkGroupService queryService,
-                                       ChunkGroupIndex groupIndex) {
+    public TicketPerfSessionController(ChunkGroupService queryService) {
         this.singleTracker = new AnalyzeSingleGroup(queryService);
-        this.allGroupTracker = new AnalyzeAllGroup(queryService, groupIndex);
+        this.allGroupTracker = new AnalyzeAllGroup(queryService);
     }
 
     public Component start(ServerLevel sourceLevel,
-                           int groupIndex,
+                           BlockPos pos,
                            int durationSec,
                            UUID playerId) {
         if (hasActiveSession()) {
             return TicketPerfMessages.analysisAlreadyRunning();
         }
         long sessionId = nextSessionId++;
-        Component response = singleTracker.start(sourceLevel, groupIndex, durationSec, playerId, sessionId);
+        Component response = singleTracker.start(sourceLevel, pos, durationSec, playerId, sessionId);
         activateTrackerIfStarted(singleTracker, sessionId);
         return response;
     }

@@ -5,6 +5,7 @@ import com.moepus.serverwarashi.common.group.ChunkGroupSnapshot;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
@@ -17,7 +18,6 @@ import net.minecraft.world.level.Level;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -76,12 +76,10 @@ public final class TicketPerfMessages {
 
 
     /**
-     * 分组索引越界时的提示。
-     *
-     * @param max 最大有效索引
+     * 指定坐标处无 ticket 分组时的提示。
      */
-    public static Component groupIndexOutOfRange(int max) {
-        return Component.literal("Group index out of range. Max = " + max);
+    public static Component noGroupAtPosition(int x, int y, int z) {
+        return Component.literal("No ticket group at (" + x + ", " + y + ", " + z + ").");
     }
 
     /**
@@ -89,7 +87,6 @@ public final class TicketPerfMessages {
      */
     public static Component sessionStarted(ResourceKey<Level> dimension,
                                            Component ownerComponent,
-                                           int groupIndex,
                                            int chunkCount,
                                            int blockEntityCount,
                                            int entityCount,
@@ -101,8 +98,7 @@ public final class TicketPerfMessages {
         message = message.append(Component.literal("    ").withStyle(ChatFormatting.DARK_GRAY))
                 .append(ownerComponent)
                 .append(Component.literal("\n").withStyle(ChatFormatting.DARK_GRAY));
-        message = message.append(Component.literal("    (G" + groupIndex
-                        + ", chunks=" + chunkCount
+        message = message.append(Component.literal("    (chunks=" + chunkCount
                         + ", BE=" + blockEntityCount
                         + ", E=" + entityCount
                         + ").\n").withStyle(ChatFormatting.GRAY));
@@ -140,25 +136,13 @@ public final class TicketPerfMessages {
             List<ChunkGroupSnapshot.ChunkGroupEntry> groups,
             ChunkGroupSnapshot.SortMode sortMode,
             ChunkGroupSnapshot.PauseMode pauseMode,
-            boolean showActions,
-            Map<TicketOwner<?>, Integer> stableIndex
+            boolean showActions
     ) {
         MutableComponent root = Component.literal(header + "\n").withStyle(ChatFormatting.AQUA)
                 .append(Component.literal("Dimension: " + dimension.location() + "\n").withStyle(ChatFormatting.GRAY));
         if (groups.isEmpty()) {
             return root.append(noTicketsFoundLine());
         }
-        List<ChunkGroupSnapshot.ChunkGroupEntry> baseEntries = groups.stream()
-                .sorted(Comparator
-                        .comparingInt((ChunkGroupSnapshot.ChunkGroupEntry entry) -> entry.stats().blockEntityCount())
-                        .reversed()
-                        .thenComparing(entry -> entry.owner().toString()))
-                .toList();
-        HashMap<TicketOwner<?>, Integer> baseIndex = new HashMap<>();
-        for (int i = 0; i < baseEntries.size(); i++) {
-            baseIndex.put(baseEntries.get(i).owner(), i);
-        }
-
         Comparator<ChunkGroupSnapshot.ChunkGroupEntry> comparator = switch (sortMode) {
             case ENTITY -> Comparator
                     .comparingInt((ChunkGroupSnapshot.ChunkGroupEntry entry) -> entry.stats().entityCount())
@@ -174,37 +158,44 @@ public final class TicketPerfMessages {
             ChunkGroupSnapshot.ChunkGroupEntry entry = entries.get(i);
             TicketOwner<?> owner = entry.owner();
             ChunkGroupSnapshot.OwnerStats stats = entry.stats();
-            int groupIndex;
-            if (stableIndex != null) {
-                groupIndex = stableIndex.getOrDefault(owner, baseIndex.getOrDefault(owner, i));
-            } else {
-                groupIndex = baseIndex.getOrDefault(owner, i);
-            }
             MutableComponent line = Component.empty()
                     .append(owner.asComponent())
                     .append(Component.literal(" ").withStyle(ChatFormatting.DARK_GRAY))
-                    .append(Component.literal("G" + groupIndex + ": ").withStyle(ChatFormatting.GRAY))
+                    .append(Component.literal("G" + i + ": ").withStyle(ChatFormatting.GRAY))
                     .append(Component.literal("C=" + stats.chunkCount() + " ").withStyle(ChatFormatting.GRAY))
                     .append(Component.literal("BE=" + stats.blockEntityCount() + " ").withStyle(ChatFormatting.GRAY))
                     .append(Component.literal("E=" + stats.entityCount() + " ").withStyle(ChatFormatting.GRAY));
             if (showActions) {
-                line = line.append(Component.literal(" "))
-                        .append(Component.literal("[A]")
-                                .withStyle(Style.EMPTY
-                                        .withColor(ChatFormatting.LIGHT_PURPLE)
-                                        .withHoverEvent(new HoverEvent(
-                                                HoverEvent.Action.SHOW_TEXT,
-                                                Component.literal("Run a 60s analysis and auto-report")
-                                        ))
-                                        .withClickEvent(new ClickEvent(
-                                                ClickEvent.Action.RUN_COMMAND,
-                                                "/warashi perf analyze start group " + groupIndex + " 60"
-                                        ))));
+                BlockPos anchor = firstChunkAnchor(entry);
+                if (anchor != null) {
+                    line = line.append(Component.literal(" "))
+                            .append(Component.literal("[A]")
+                                    .withStyle(Style.EMPTY
+                                            .withColor(ChatFormatting.LIGHT_PURPLE)
+                                            .withHoverEvent(new HoverEvent(
+                                                    HoverEvent.Action.SHOW_TEXT,
+                                                    Component.literal("Run a 60s analysis and auto-report")
+                                            ))
+                                            .withClickEvent(new ClickEvent(
+                                                    ClickEvent.Action.RUN_COMMAND,
+                                                    "/warashi perf analyze start at "
+                                                            + anchor.getX() + " " + anchor.getY() + " " + anchor.getZ()
+                                                            + " 60"
+                                            ))));
+                }
             }
             line = line.append(Component.literal("\n").withStyle(ChatFormatting.DARK_GRAY));
             root = root.append(line);
         }
         return root;
+    }
+
+    private static BlockPos firstChunkAnchor(ChunkGroupSnapshot.ChunkGroupEntry entry) {
+        var iterator = entry.chunks().iterator();
+        if (!iterator.hasNext()) {
+            return null;
+        }
+        return new ChunkPos(iterator.next()).getWorldPosition();
     }
 
     /**
@@ -228,6 +219,7 @@ public final class TicketPerfMessages {
         if (entries.isEmpty()) {
             return root.append(noTicketsFoundLine());
         }
+        int displayIndex = 0;
         for (GroupMsptEntry entry : entries) {
             double entryMspt = mspt(entry.totalNanos(), serverTickCount);
             if (entryMspt < 0.01) {
@@ -237,7 +229,7 @@ public final class TicketPerfMessages {
             MutableComponent line = Component.empty()
                     .append(entry.owner().asComponent())
                     .append(Component.literal(" ").withStyle(ChatFormatting.DARK_GRAY))
-                    .append(Component.literal("G" + entry.groupIndex() + ": ").withStyle(ChatFormatting.GRAY))
+                    .append(Component.literal("G" + displayIndex++ + ": ").withStyle(ChatFormatting.GRAY))
                     .append(Component.literal(String.format("C=%d, BE=%d, E=%d",
                                     entry.chunkCount(),
                                     entry.blockEntityCount(),
@@ -258,7 +250,7 @@ public final class TicketPerfMessages {
      * 单分组性能报告数据。
      */
     public record SingleGroupReport(
-            ResourceKey<Level> dimension, int groupIndex, String ownerLabel,
+            ResourceKey<Level> dimension, String ownerLabel,
             int chunkCount, int blockEntityCount, int entityCount,
             long serverTickCount,
             long beTotalNanos, long beMaxNanos,
@@ -288,7 +280,7 @@ public final class TicketPerfMessages {
         MutableComponent root = Component.literal("Serverwarashi Profiler Report\n")
                 .withStyle(ChatFormatting.AQUA)
                 .append(Component.literal("====================================\n").withStyle(ChatFormatting.DARK_GRAY))
-                .append(Component.literal("Target: " + r.dimension.location() + " | G" + r.groupIndex + " " + r.ownerLabel + " ")
+                .append(Component.literal("Target: " + r.dimension.location() + " | " + r.ownerLabel + " ")
                         .withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("Chunks: " + r.chunkCount
@@ -433,8 +425,7 @@ public final class TicketPerfMessages {
     /**
      * 单个分组的性能汇总行。
      */
-    public record GroupMsptEntry(int groupIndex,
-                                 TicketOwner<?> owner,
+    public record GroupMsptEntry(TicketOwner<?> owner,
                                  int chunkCount,
                                  int blockEntityCount,
                                  int entityCount,

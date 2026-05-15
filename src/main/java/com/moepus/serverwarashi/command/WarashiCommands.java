@@ -17,7 +17,6 @@ public class WarashiCommands {
                 .requires(ADMIN_PERMISSION);
         BucketCommands.register(root);
         PerfCommands.register(root);
-        PauseCommands.register(root);
         IdleFreezeCommands.register(root);
         dispatcher.register(root);
     }

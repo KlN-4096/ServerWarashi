@@ -1,8 +1,6 @@
 package com.moepus.serverwarashi.modules.bucket;
 
 import com.moepus.serverwarashi.common.ticket.TicketPauseService;
-import com.moepus.serverwarashi.config.TicketBucketConfig;
-import com.moepus.serverwarashi.modules.pause.TicketPauseApi;
 import com.moepus.serverwarashi.modules.performance.TicketPerfRuntime;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -32,14 +30,11 @@ public final class TicketBucketRuntime {
     }
 
     /**
-     * 在维度 tick 中执行手动暂停重放和自动分桶。
+     * 在维度 tick 中执行自动分桶。
      *
      * @param level 目标维度
      */
     public static void onLevelTickPre(ServerLevel level) {
-        if (tickAge % TicketBucketConfig.runEvery() == 0) {
-            TicketPauseApi.replayPendingManualPause(level);
-        }
         if (TicketPerfRuntime.hasActiveSession(level) && ANALYSIS_SUSPENDED_LEVELS.add(level.dimension())) {
             TicketPauseService.clearAutoPause(level);
             return;

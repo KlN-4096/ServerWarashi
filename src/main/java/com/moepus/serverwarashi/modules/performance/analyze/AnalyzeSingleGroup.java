@@ -6,6 +6,7 @@ import com.moepus.serverwarashi.common.group.ChunkGroupSnapshot;
 import com.moepus.serverwarashi.modules.performance.report.TicketPerfMessages;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -26,7 +27,7 @@ public final class AnalyzeSingleGroup extends AnalyzeAbstractGroup<SingleGroupSe
     }
 
     public Component start(ServerLevel sourceLevel,
-                           int groupIndex,
+                           BlockPos pos,
                            int durationSec,
                            UUID playerId,
                            long sessionId) {
@@ -34,7 +35,7 @@ public final class AnalyzeSingleGroup extends AnalyzeAbstractGroup<SingleGroupSe
                 sourceLevel,
                 durationSec,
                 playerId,
-                effectiveDuration -> prepareStart(sourceLevel, groupIndex, effectiveDuration, sessionId)
+                effectiveDuration -> prepareStart(sourceLevel, pos, effectiveDuration, sessionId)
         );
     }
 
@@ -43,17 +44,18 @@ public final class AnalyzeSingleGroup extends AnalyzeAbstractGroup<SingleGroupSe
     }
 
     private StartResult<SingleGroupSession> prepareStart(ServerLevel sourceLevel,
-                                                         int groupIndex,
+                                                         BlockPos pos,
                                                          int effectiveDuration,
                                                          long sessionId) {
         queryService.refresh(sourceLevel);
-        ChunkGroupService.GroupLookup lookup = queryService.resolveGroup(
+        long chunkPos = new ChunkPos(pos).toLong();
+        ChunkGroupService.GroupChunkLookup lookup = queryService.resolveGroupAtChunk(
                 sourceLevel,
-                groupIndex,
-                ChunkGroupSnapshot.PauseMode.ACTIVE_ONLY
+                chunkPos,
+                ChunkGroupSnapshot.PauseMode.ALL
         );
         if (lookup.failure() != null) {
-            return startError(toLookupError(lookup.failure()));
+            return startError(TicketPerfMessages.noGroupAtPosition(pos.getX(), pos.getY(), pos.getZ()));
         }
 
         ChunkGroupSnapshot.ChunkGroupEntry entry = lookup.entry();
@@ -62,7 +64,6 @@ public final class AnalyzeSingleGroup extends AnalyzeAbstractGroup<SingleGroupSe
         SingleGroupSession session = new SingleGroupSession(
                 sessionId,
                 sourceLevel.dimension(),
-                groupIndex,
                 targetChunks,
                 entry.label(),
                 stats.blockEntityCount(),
@@ -73,7 +74,6 @@ public final class AnalyzeSingleGroup extends AnalyzeAbstractGroup<SingleGroupSe
                 TicketPerfMessages.sessionStarted(
                         sourceLevel.dimension(),
                         entry.owner().asComponent(),
-                        groupIndex,
                         stats.chunkCount(),
                         stats.blockEntityCount(),
                         stats.entityCount(),
@@ -126,7 +126,7 @@ public final class AnalyzeSingleGroup extends AnalyzeAbstractGroup<SingleGroupSe
     protected Component buildReport(SingleGroupSession session) {
         long elapsedNanos = System.nanoTime() - session.startedAtNanos;
         return TicketPerfMessages.buildReport(new TicketPerfMessages.SingleGroupReport(
-                session.dimension, session.groupIndex, session.ownerLabel,
+                session.dimension, session.ownerLabel,
                 session.targetChunks.size(), session.blockEntityCount, session.entityCount,
                 session.serverTickCount,
                 session.beTotalNanos, session.beMaxNanos,
@@ -219,17 +219,9 @@ public final class AnalyzeSingleGroup extends AnalyzeAbstractGroup<SingleGroupSe
         spikeLabels.put(sourceId, sourceLabel);
     }
 
-    private Component toLookupError(ChunkGroupService.LookupFailure failure) {
-        return switch (failure.reason()) {
-            case NO_GROUPS, CHUNK_NOT_FOUND -> TicketPerfMessages.noTicketGroupsFound();
-            case INDEX_OUT_OF_RANGE, INDEX_MAPPING_MISSING ->
-                    TicketPerfMessages.groupIndexOutOfRange(failure.maxStableIndex());
-        };
-    }
 }
 
 final class SingleGroupSession extends GroupSession {
-    public final int groupIndex;
     public final String ownerLabel;
     public final LongOpenHashSet targetChunks;
     public final int blockEntityCount;
@@ -262,13 +254,11 @@ final class SingleGroupSession extends GroupSession {
 
     public SingleGroupSession(long id,
                               ResourceKey<Level> dimension,
-                              int groupIndex,
                               LongOpenHashSet targetChunks,
                               String ownerLabel,
                               int blockEntityCount,
                               int entityCount) {
         super(id, dimension);
-        this.groupIndex = groupIndex;
         this.targetChunks = targetChunks;
         this.ownerLabel = ownerLabel;
         this.blockEntityCount = blockEntityCount;

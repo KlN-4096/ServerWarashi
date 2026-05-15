@@ -4,7 +4,6 @@ import com.moepus.serverwarashi.common.group.ChunkGroupService;
 import com.moepus.serverwarashi.modules.performance.analyze.TicketPerfSessionController;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -19,7 +18,7 @@ import java.util.UUID;
  */
 public final class TicketPerfRuntime {
     static final TicketPerfSessionController SESSION_MANAGER =
-            new TicketPerfSessionController(ChunkGroupService.instance(), ChunkGroupService.groupIndex());
+            new TicketPerfSessionController(ChunkGroupService.instance());
 
     private TicketPerfRuntime() {
     }
@@ -28,13 +27,11 @@ public final class TicketPerfRuntime {
 
     public static void rebuildSnapshots(MinecraftServer server) {
         ChunkGroupService.snapshotCache().clear();
-        ChunkGroupService.groupIndex().clear();
         ChunkGroupService.instance().refreshAll(server);
     }
 
     public static void clearSnapshots() {
         ChunkGroupService.snapshotCache().clear();
-        ChunkGroupService.groupIndex().clear();
         SESSION_MANAGER.clearRuntimeState();
     }
 
@@ -84,8 +81,8 @@ public final class TicketPerfRuntime {
 
     // --- 会话控制（Api 委托） ---
 
-    static Component start(ServerLevel sourceLevel, int groupIndex, int durationSec, UUID playerId) {
-        return SESSION_MANAGER.start(sourceLevel, groupIndex, durationSec, playerId);
+    static Component start(ServerLevel sourceLevel, BlockPos pos, int durationSec, UUID playerId) {
+        return SESSION_MANAGER.start(sourceLevel, pos, durationSec, playerId);
     }
 
     static Component startAll(ServerLevel level, int durationSec, UUID playerId) {

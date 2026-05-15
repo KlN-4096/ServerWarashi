@@ -1,6 +1,6 @@
 package com.moepus.serverwarashi.command;
 
-import com.moepus.serverwarashi.modules.pause.TicketPauseApi;
+import com.moepus.serverwarashi.common.ticket.TicketPauseService;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -46,7 +46,7 @@ public final class BucketCommands {
                                         () -> {
                                             if (!TicketBucketConfig.enabled()) {
                                                 context.getSource().getServer().getAllLevels()
-                                                        .forEach(TicketPauseApi::clearAutoPause);
+                                                        .forEach(TicketPauseService::clearAutoPause);
                                             }
                                         },
                                         TicketBucketConfig::enabled

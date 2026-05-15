@@ -5,7 +5,6 @@ import com.moepus.serverwarashi.common.ticket.TicketPauseService;
 import com.moepus.serverwarashi.common.ticket.TicketUtils;
 import com.moepus.serverwarashi.config.TicketBucketConfig;
 import com.moepus.serverwarashi.mixin.DistanceManagerAccessor;
-import com.moepus.serverwarashi.modules.pause.ManualPauseData;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import net.minecraft.server.level.ServerLevel;
@@ -31,7 +30,7 @@ public final class TicketBucketService {
             return;
         }
         DistanceManagerAccessor distanceManager = TicketUtils.getDistanceManager(level);
-        var tickets = collectTickets(TicketUtils.getTickets(distanceManager).long2ObjectEntrySet(), ManualPauseData.get(level));
+        var tickets = collectTickets(TicketUtils.getTickets(distanceManager).long2ObjectEntrySet());
         if (tickets.isEmpty()) {
             return;
         }
@@ -49,19 +48,14 @@ public final class TicketBucketService {
      * 实例（level=31），借此天然覆盖玩家可见范围，避免削掉这些 chunk 的实体 tick。
      *
      * @param tickets 当前维度全部 ticket 入口
-     * @param manualData 手动暂停数据
      * @return 可参与自动分桶的 ticket 列表
      */
     private List<TicketEntry> collectTickets(
-            Iterable<? extends Long2ObjectMap.Entry<? extends Iterable<Ticket<?>>>> tickets,
-            ManualPauseData manualData
+            Iterable<? extends Long2ObjectMap.Entry<? extends Iterable<Ticket<?>>>> tickets
     ) {
         List<TicketEntry> allTickets = new ArrayList<>();
         for (var entry : tickets) {
             long chunkPosLong = entry.getLongKey();
-            if (manualData.contains(chunkPosLong)) {
-                continue;
-            }
             if (containsSystemTicket(entry.getValue())) {
                 continue;
             }

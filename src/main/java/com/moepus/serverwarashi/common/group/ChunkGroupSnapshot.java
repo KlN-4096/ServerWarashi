@@ -60,13 +60,11 @@ public class ChunkGroupSnapshot {
      */
     public enum PauseMode {
         ACTIVE_ONLY,
-        PAUSED_ONLY,
         ALL;
 
         public boolean accept(boolean paused) {
             return switch (this) {
                 case ACTIVE_ONLY -> !paused;
-                case PAUSED_ONLY -> paused;
                 case ALL -> true;
             };
         }

@@ -1,6 +1,5 @@
 package com.moepus.serverwarashi.modules.performance.report;
 
-import com.moepus.serverwarashi.common.ticket.TicketOwner;
 import com.moepus.serverwarashi.common.group.ChunkGroupService;
 import com.moepus.serverwarashi.common.group.ChunkGroupSnapshot;
 import net.minecraft.core.BlockPos;
@@ -60,7 +59,6 @@ public final class TicketPerfGroupOutput {
         ChunkGroupService groupQueries = ChunkGroupService.instance();
         ChunkGroupSnapshot.SnapshotData snapshot = groupQueries.refreshSnapshot(level, pauseMode);
         List<ChunkGroupSnapshot.ChunkGroupEntry> groups = snapshot.groups();
-        Map<TicketOwner<?>, Integer> indexMap = groupQueries.indexMap(level, groups);
         if (saveCsv && !snapshot.chunkLoadInfoMap().isEmpty()) {
             dumpToCsv(snapshot.chunkLoadInfoMap());
         }
@@ -70,8 +68,7 @@ public final class TicketPerfGroupOutput {
                 groups,
                 sortMode,
                 pauseMode,
-                showActions,
-                indexMap
+                showActions
         );
     }
 }

@@ -2,6 +2,7 @@ package com.moepus.serverwarashi.modules.performance;
 
 import com.moepus.serverwarashi.common.group.ChunkGroupSnapshot;
 import com.moepus.serverwarashi.modules.performance.report.TicketPerfGroupOutput;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 
@@ -42,10 +43,10 @@ public final class TicketPerfApi {
     }
 
     public static Component start(ServerLevel sourceLevel,
-                                  int groupIndex,
+                                  BlockPos pos,
                                   int durationSec,
                                   UUID playerId) {
-        return TicketPerfRuntime.start(sourceLevel, groupIndex, durationSec, playerId);
+        return TicketPerfRuntime.start(sourceLevel, pos, durationSec, playerId);
     }
 
     public static Component startAll(ServerLevel level, int durationSec, UUID playerId) {
