@@ -55,6 +55,9 @@ public final class TicketPauseService {
 
     /**
      * 重排 ticketSet 并根据实际 level 变化更新 tracker。
+     * 新旧 level 都取 {@link Ticket#getTicketLevel()}（masked），与 vanilla
+     * {@code ChunkTicketTracker.getLevelFromSource} 度量一致，避免误判
+     * isDecreasing 导致 tickingTicketsTracker 漏同步。
      */
     public static void updateChunkLevel(DistanceManagerAccessor distanceManager, LongOpenHashSet modifiedChunks) {
         for (long chunkPos : modifiedChunks) {
@@ -62,10 +65,10 @@ public final class TicketPauseService {
             if (ticketSet == null) {
                 continue;
             }
-            int originalLevel = getOriginalTicketLevel(ticketSet);
+            int oldLevel = getTicketLevel(ticketSet);
             resortTicketSet(ticketSet);
             int newLevel = getTicketLevel(ticketSet);
-            boolean isDecreasing = newLevel <= originalLevel;
+            boolean isDecreasing = newLevel <= oldLevel;
             distanceManager.getTicketTracker().update(chunkPos, newLevel, isDecreasing);
             if (!ticketSet.isEmpty() && isDecreasing) {
                 distanceManager.getTickingTicketsTracker().update(chunkPos, newLevel, true);
@@ -76,11 +79,6 @@ public final class TicketPauseService {
     private static int getTicketLevel(SortedArraySet<Ticket<?>> tickets) {
         if (tickets.isEmpty()) return 45;
         return tickets.first().getTicketLevel();
-    }
-
-    private static int getOriginalTicketLevel(SortedArraySet<Ticket<?>> tickets) {
-        if (tickets.isEmpty()) return 45;
-        return ((IPauseableTicket) (Object) tickets.first()).serverWarashi$getLevel();
     }
 
     private static void resortTicketSet(SortedArraySet<Ticket<?>> tickets) {
