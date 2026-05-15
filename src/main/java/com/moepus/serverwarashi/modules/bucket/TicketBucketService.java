@@ -43,7 +43,10 @@ public final class TicketBucketService {
     }
 
     /**
-     * 收集参与自动分桶的非系统 ticket。
+     * 收集参与自动分桶的 ticket。
+     * 若 chunk 内含有任意系统 ticket（如 PLAYER），整 chunk 跳过分桶。
+     * vanilla 会在玩家 viewDistance 范围内每个 chunk 都注册一个 PLAYER ticket
+     * 实例（level=31），借此天然覆盖玩家可见范围，避免削掉这些 chunk 的实体 tick。
      *
      * @param tickets 当前维度全部 ticket 入口
      * @param manualData 手动暂停数据
@@ -59,17 +62,27 @@ public final class TicketBucketService {
             if (manualData.contains(chunkPosLong)) {
                 continue;
             }
+            if (containsSystemTicket(entry.getValue())) {
+                continue;
+            }
             int chunkX = ChunkPos.getX(chunkPosLong);
             int chunkZ = ChunkPos.getZ(chunkPosLong);
             long morton = TicketMorton.morton2D(chunkX, chunkZ);
 
             for (Ticket<?> ticket : entry.getValue()) {
-                if (!TicketUtils.isSystemTicket(ticket)) {
-                    allTickets.add(new TicketEntry(ticket, morton, chunkPosLong));
-                }
+                allTickets.add(new TicketEntry(ticket, morton, chunkPosLong));
             }
         }
         return allTickets;
+    }
+
+    private static boolean containsSystemTicket(Iterable<? extends Ticket<?>> tickets) {
+        for (Ticket<?> ticket : tickets) {
+            if (TicketUtils.isSystemTicket(ticket)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
